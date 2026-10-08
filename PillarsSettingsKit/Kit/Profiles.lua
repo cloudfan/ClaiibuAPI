@@ -120,21 +120,56 @@ function Profiles.Switch(kit, name)
 	kit:ProfileChanged()
 end
 
--- Saves the live settings as a new (or replaced) profile and makes it active.
-function Profiles.SaveAs(kit, name)
+-- Saves a profile string (the live settings when text is nil) under name,
+-- replacing any profile of that name, and makes it active.
+function Profiles.SaveAs(kit, name, text)
 	name = Profiles.CleanName(name)
 	if not name then
 		return false
 	end
 	Profiles.Flush(kit)
-	local text = Serializer.EncodeSettings(kit.settings, kit.defaults)
+	text = text or Serializer.EncodeSettings(kit.settings, kit.defaults)
 	if not text then
 		return false
 	end
 	kit.db.profiles[name] = text
-	kit.charDB.profile = name
+	Activate(kit, name)
 	kit:ProfileChanged()
 	return true
+end
+
+-- The active profile as a string to copy.
+function Profiles.Export(kit)
+	Profiles.Flush(kit)
+	return kit.db.profiles[Profiles.Active(kit)]
+end
+
+-- Checks a pasted string. Returns it rewritten in standard form (unknown
+-- keys and wrong types dropped), or nil and the reason.
+function Profiles.ParseImport(kit, text)
+	if type(text) ~= "string" then
+		return nil, "nothing to import"
+	end
+	text = text:gsub("%s", "")
+	if text == "" then
+		return nil, "the box is empty"
+	end
+	local stored, err = Serializer.Decode(text)
+	if not stored then
+		return nil, "that is not a settings string (" .. tostring(err) .. ")"
+	end
+	local any, known = false, false
+	for key in pairs(stored) do
+		any = true
+		if kit.defaults[key] ~= nil then
+			known = true
+		end
+	end
+	if any and not known then
+		return nil, "that string is for a different addon"
+	end
+	local settings = Serializer.DecodeSettings(text, kit.defaults)
+	return Serializer.EncodeSettings(settings, kit.defaults)
 end
 
 function Profiles.Delete(kit, name)
@@ -233,7 +268,7 @@ end
 
 local function RegisterPopups(kit)
 	StaticPopupDialogs[POPUP_SAVE] = {
-		text = "Save the current settings as a new profile named:",
+		text = "Save %s as a new profile named:",
 		button1 = SAVE or "Save",
 		button2 = CANCEL or "Cancel",
 		hasEditBox = true,
@@ -246,14 +281,14 @@ local function RegisterPopups(kit)
 				edit:HighlightText()
 			end
 		end,
-		OnAccept = function(dialog)
+		OnAccept = function(dialog, data)
 			local edit = EditBoxOf(dialog)
-			kit:RequestSaveAs(edit and edit:GetText())
+			kit:RequestSaveAs(edit and edit:GetText(), data and data.text)
 		end,
-		EditBoxOnEnterPressed = function(edit)
-			local text = edit:GetText()
+		EditBoxOnEnterPressed = function(edit, data)
+			local name = edit:GetText()
 			StaticPopup_Hide(POPUP_SAVE)
-			kit:RequestSaveAs(text)
+			kit:RequestSaveAs(name, data and data.text)
 		end,
 		EditBoxOnEscapePressed = function()
 			StaticPopup_Hide(POPUP_SAVE)
@@ -264,11 +299,11 @@ local function RegisterPopups(kit)
 		preferredIndex = 3,
 	}
 	StaticPopupDialogs[POPUP_OVERWRITE] = {
-		text = "A profile named \"%s\" already exists. Replace it with the current settings?",
+		text = "A profile named \"%s\" already exists. Replace it?",
 		button1 = YES or "Yes",
 		button2 = NO or "No",
 		OnAccept = function(_, data)
-			Profiles.SaveAs(kit, data.name)
+			Profiles.SaveAs(kit, data.name, data.text)
 		end,
 		timeout = 0,
 		whileDead = true,
@@ -300,37 +335,49 @@ function Profiles.InitDialogs(kit)
 	end
 end
 
--- "Save current settings..."
-function Profiles.PromptSave(kit)
-	local default = C.CharacterProfileName()
+-- "Save current settings..." (text nil), or naming an imported string.
+function Profiles.PromptSave(kit, text, default)
+	default = default or C.CharacterProfileName()
+	local what = text and "the imported settings" or "the current settings"
 	if UsePopups() then
-		StaticPopup_Show(POPUP_SAVE, nil, nil, { default = default })
+		StaticPopup_Show(POPUP_SAVE, what, nil, { default = default, text = text })
 		return
 	end
 	ShowFallback({
-		text = "Save the current settings as a new profile named:",
+		text = format("Save %s as a new profile named:", what),
 		button1 = SAVE or "Save",
 		button2 = CANCEL or "Cancel",
 		editText = default,
-		onAccept = function(text)
-			kit:RequestSaveAs(text)
+		onAccept = function(name)
+			kit:RequestSaveAs(name, text)
 		end,
 	})
 end
 
-function Profiles.PromptOverwrite(kit, name)
+function Profiles.PromptOverwrite(kit, name, text)
 	if UsePopups() then
-		StaticPopup_Show(POPUP_OVERWRITE, name, nil, { name = name })
+		StaticPopup_Show(POPUP_OVERWRITE, name, nil, { name = name, text = text })
 		return
 	end
 	ShowFallback({
-		text = format("A profile named \"%s\" already exists. Replace it with the current settings?", name),
+		text = format("A profile named \"%s\" already exists. Replace it?", name),
 		button1 = YES or "Yes",
 		button2 = NO or "No",
 		onAccept = function()
-			Profiles.SaveAs(kit, name)
+			Profiles.SaveAs(kit, name, text)
 		end,
 	})
+end
+
+-- "Import": checks the pasted string, then asks for the new profile's name.
+function Profiles.PromptImport(kit, pasted)
+	local text, err = Profiles.ParseImport(kit, pasted)
+	if not text then
+		kit:Print("Could not import: " .. err .. ".")
+		return false
+	end
+	Profiles.PromptSave(kit, text, "Imported")
+	return true
 end
 
 -- "Delete current profile..."

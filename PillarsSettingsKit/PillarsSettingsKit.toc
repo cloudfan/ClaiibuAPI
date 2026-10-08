@@ -2,7 +2,7 @@
 ## Title: Pillars Settings Kit
 ## Notes: A settings framework for WoW: Forever addons, with a demo page and a preview panel.
 ## Author: cloudfan
-## Version: 0.1.0
+## Version: 0.2.0
 ## OptionalDeps: LibSharedMedia-3.0
 ## SavedVariables: PillarsSettingsKitDB
 ## SavedVariablesPerCharacter: PillarsSettingsKitCharDB

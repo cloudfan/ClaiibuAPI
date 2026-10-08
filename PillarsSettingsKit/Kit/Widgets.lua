@@ -24,9 +24,7 @@ local STEPPER_ATLAS = { "Minimal_SliderBar_Button_Left", "Minimal_SliderBar_Butt
 local native = {}
 
 function W.Detect(used)
-	native.tabSystem = C.HasTemplate("TabSystemTemplate")
-	native.topTab = C.HasTemplate("PanelTopTabButtonTemplate") and PanelTemplates_SetTab ~= nil
-		and PanelTemplates_SetNumTabs ~= nil
+	native.inputScroll = C.HasTemplate("InputScrollFrameTemplate")
 	native.dropdown = C.HasTemplate("WowStyle1DropdownTemplate")
 	native.dropdownWithButtons = C.HasTemplate("SettingsDropdownWithButtonsTemplate")
 	native.slider = C.HasTemplate("MinimalSliderWithSteppersTemplate") and MinimalSliderWithSteppersMixin ~= nil
@@ -91,124 +89,6 @@ function W.ScrollArea(parent)
 		end)
 	end
 	return scroll, child
-end
-
--- Tabs -----------------------------------------------------------------------------
--- Blizzard's TabSystemTemplate (the top tabs of the modern UI). Falls back to
--- PanelTopTabButtonTemplate, then to plain panel buttons.
-
-local function TabSystemTabs(parent, names, onSelect)
-	local system = CreateFrame("Frame", nil, parent, "TabSystemTemplate")
-	system:SetPoint("TOPLEFT", 4, 0)
-	local ids = {}
-	for i, name in ipairs(names) do
-		ids[i] = system:AddTab(name)
-	end
-	local indexOf = {}
-	for i, id in ipairs(ids) do
-		indexOf[id] = i
-	end
-	system:SetTabSelectedCallback(function(id)
-		onSelect(indexOf[id])
-		return false -- let the tab system draw the selection
-	end)
-	return system, function(index)
-		system:SetTab(ids[index])
-	end
-end
-
-local function TopTabs(parent, names, onSelect)
-	local holder = CreateFrame("Frame", nil, parent)
-	holder:SetPoint("TOPLEFT", 4, 0)
-	holder:SetSize(1, 32)
-	holder.Tabs = {}
-	local previous
-	for i, name in ipairs(names) do
-		local tab = CreateFrame("Button", nil, holder, "PanelTopTabButtonTemplate")
-		tab:SetID(i)
-		tab:SetText(name)
-		if PanelTemplates_TabResize then
-			PanelTemplates_TabResize(tab, 0)
-		end
-		if previous then
-			tab:SetPoint("LEFT", previous, "RIGHT", 2, 0)
-		else
-			tab:SetPoint("BOTTOMLEFT", holder, "BOTTOMLEFT", 0, 0)
-		end
-		holder.Tabs[i] = tab
-		previous = tab
-	end
-	PanelTemplates_SetNumTabs(holder, #names)
-	local function Select(index)
-		PanelTemplates_SetTab(holder, index)
-		onSelect(index)
-	end
-	for i, tab in ipairs(holder.Tabs) do
-		tab:SetScript("OnClick", function()
-			if PlaySound and SOUNDKIT and SOUNDKIT.IG_CHARACTER_INFO_TAB then
-				PlaySound(SOUNDKIT.IG_CHARACTER_INFO_TAB)
-			end
-			Select(i)
-		end)
-	end
-	return holder, Select
-end
-
-local function ButtonTabs(parent, names, onSelect)
-	local holder = CreateFrame("Frame", nil, parent)
-	holder:SetPoint("TOPLEFT", 4, 0)
-	holder:SetSize(1, 26)
-	local buttons = {}
-	local previous
-	for i, name in ipairs(names) do
-		local button = CreateFrame("Button", nil, holder, "UIPanelButtonTemplate")
-		button:SetText(name)
-		button:SetSize(math.max(80, button:GetFontString():GetStringWidth() + 24), 24)
-		if previous then
-			button:SetPoint("LEFT", previous, "RIGHT", 4, 0)
-		else
-			button:SetPoint("LEFT")
-		end
-		buttons[i] = button
-		previous = button
-	end
-	local function Select(index)
-		for i, button in ipairs(buttons) do
-			button:SetEnabled(i ~= index)
-		end
-		onSelect(index)
-	end
-	for i, button in ipairs(buttons) do
-		button:SetScript("OnClick", function()
-			Select(i)
-		end)
-	end
-	return holder, Select
-end
-
--- onSelect(index) runs whenever a tab is chosen. Returns the tab row and a
--- function that selects a tab by index.
-function W.Tabs(parent, names, onSelect)
-	if native.tabSystem then
-		-- pcall only guards against a template whose methods differ on this
-		-- build. Nothing in it is protected.
-		local ok, row, select = pcall(TabSystemTabs, parent, names, onSelect)
-		if ok then
-			W.used.tabs = "TabSystemTemplate"
-			return row, select
-		end
-		W.used.tabsError = row
-	end
-	if native.topTab then
-		local ok, row, select = pcall(TopTabs, parent, names, onSelect)
-		if ok then
-			W.used.tabs = "PanelTopTabButtonTemplate"
-			return row, select
-		end
-		W.used.tabsError = row
-	end
-	W.used.tabs = "UIPanelButtonTemplate"
-	return ButtonTabs(parent, names, onSelect)
 end
 
 -- Page -----------------------------------------------------------------------------
@@ -594,4 +474,99 @@ function Page:Button(spec)
 		end
 	end
 	return button
+end
+
+-- Text box ---------------------------------------------------------------------------
+-- A multi-line box across the page. Blizzard's InputScrollFrameTemplate, or
+-- the same thing from parts.
+-- spec: height, get() -> text (shown on refresh), tooltip, label
+
+local function NativeTextBox(parent, height)
+	local frame = CreateFrame("ScrollFrame", nil, parent, "InputScrollFrameTemplate")
+	frame:SetHeight(height)
+	local edit = frame.EditBox
+	if not edit then
+		error("InputScrollFrameTemplate has no EditBox", 0)
+	end
+	if frame.CharCount then
+		frame.CharCount:Hide()
+	end
+	frame:SetScript("OnSizeChanged", function(_, width)
+		edit:SetWidth(width - 18)
+	end)
+	return frame, edit
+end
+
+local function PlainTextBox(parent, height)
+	local border = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+	border:SetHeight(height)
+	border:SetBackdrop({ bgFile = WHITE, edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12,
+		insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+	border:SetBackdropColor(0, 0, 0, 0.6)
+	border:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+	local scroll, child = W.ScrollArea(border)
+	scroll:SetPoint("TOPLEFT", 6, -6)
+	scroll:SetPoint("BOTTOMRIGHT", -26, 6)
+	local edit = CreateFrame("EditBox", nil, child)
+	edit:SetMultiLine(true)
+	edit:SetFontObject("ChatFontNormal")
+	edit:SetAutoFocus(false)
+	edit:SetPoint("TOPLEFT")
+	edit:SetPoint("RIGHT", child, "RIGHT")
+	edit:SetHeight(height)
+	child:SetHeight(height)
+	edit:SetScript("OnEscapePressed", edit.ClearFocus)
+	border:EnableMouse(true)
+	border:SetScript("OnMouseDown", function()
+		edit:SetFocus()
+	end)
+	return border, edit
+end
+
+function Page:TextBox(spec)
+	self.first = false
+	local height = spec.height or 90
+	local frame, edit
+	if native.inputScroll then
+		local ok, f, e = pcall(NativeTextBox, self.frame, height)
+		if ok then
+			frame, edit = f, e
+			W.used.textBox = "InputScrollFrameTemplate"
+		end
+	end
+	if not frame then
+		frame, edit = PlainTextBox(self.frame, height)
+		W.used.textBox = "plain"
+	end
+	frame:SetPoint("TOPLEFT", W.LABEL_X, self.y - 4)
+	frame:SetPoint("RIGHT", self.frame, "RIGHT", -W.LABEL_X, 0)
+	edit:SetMaxLetters(0)
+	edit:SetAutoFocus(false)
+	-- Selecting everything on focus makes Ctrl+C / Ctrl+V a single step.
+	edit:HookScript("OnEditFocusGained", function(box)
+		box:HighlightText()
+	end)
+	W.AttachTooltip(edit, spec.label or "", spec.tooltip)
+	self.y = self.y - height - 12
+	if spec.get then
+		self.controls[#self.controls + 1] = function()
+			if not edit:HasFocus() then
+				edit:SetText(spec.get() or "")
+				edit:SetCursorPosition(0)
+			end
+		end
+	end
+	return edit
+end
+
+-- Page title, as on Blizzard's canvas pages: the name and a divider.
+-- Returns the y below the divider.
+function W.PageTitle(parent, text)
+	local title = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlightHuge")
+	title:SetPoint("TOPLEFT", 7, -22)
+	title:SetText(text)
+	local divider = W.Divider(parent)
+	divider:SetPoint("TOPLEFT", 0, -50)
+	divider:SetPoint("TOPRIGHT", 0, -50)
+	return -56
 end

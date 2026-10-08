@@ -1,8 +1,7 @@
 local addonName, ns = ...
 
--- The settings window: one entry in Options -> AddOns with a row of tabs.
--- The first tab is the landing page, then the addon's own pages, then
--- Profiles.
+-- The settings: one entry in Options -> AddOns (the landing page) with a
+-- collapsible sublist under it: the addon's own pages, then Profiles.
 --
 --   local kit = ns.SettingsKit.New({ ... })   -- at file scope
 --   local page = kit:AddPage("General")
@@ -62,6 +61,12 @@ function PageSpec:MediaDropdown(spec)
 	return Add(self, "MediaDropdown", spec)
 end
 
+-- spec: key, label (default "Font Shadow"), tooltip. Values are the keys of
+-- Media.SHADOWS; apply them with kit:ApplyFont.
+function PageSpec:FontShadow(spec)
+	return Add(self, "FontShadow", spec)
+end
+
 -- spec: label, text, tooltip, width, onClick(kit), enabled(kit)
 function PageSpec:Button(spec)
 	return Add(self, "Button", spec)
@@ -110,6 +115,16 @@ function Kit:GetMedia(mediaType, key)
 	return Media.Get(mediaType, self.settings[key])
 end
 
+-- Sets a FontString from settings: kit:ApplyFont(fs, "font", "fontSize", "fontShadow").
+-- size may be a setting key or a number; flags is optional ("OUTLINE").
+function Kit:ApplyFont(fontString, fontKey, size, shadowKey, flags)
+	if type(size) == "string" then
+		size = self.settings[size]
+	end
+	Media.ApplyFont(fontString, self.settings[fontKey], size,
+		shadowKey and self.settings[shadowKey] or "none", flags)
+end
+
 function Kit:PlaySound(key, channel)
 	Media.PlaySound(self.settings[key], channel)
 end
@@ -128,17 +143,19 @@ function Kit:ProfileChanged()
 	end)
 end
 
-function Kit:RequestSaveAs(text)
-	local name = Profiles.CleanName(text)
+-- Saves under a typed name. text is an imported profile string, or nil for
+-- the current settings.
+function Kit:RequestSaveAs(typed, text)
+	local name = Profiles.CleanName(typed)
 	if not name then
 		self:Print("A profile needs a name.")
 		return
 	end
 	if self.db.profiles[name] and name ~= Profiles.Active(self) then
-		Profiles.PromptOverwrite(self, name)
+		Profiles.PromptOverwrite(self, name, text)
 		return
 	end
-	Profiles.SaveAs(self, name)
+	Profiles.SaveAs(self, name, text)
 	self:Print("Saved profile \"" .. name .. "\".")
 end
 
@@ -227,6 +244,15 @@ function BUILD.MediaDropdown(kit, page, spec)
 	page:Dropdown(bound)
 end
 
+function BUILD.FontShadow(kit, page, spec)
+	local bound = Bind(kit, spec)
+	bound.label = spec.label or "Font Shadow"
+	bound.options = function()
+		return Media.SHADOWS
+	end
+	page:Dropdown(bound)
+end
+
 function BUILD.Button(kit, page, spec)
 	local bound = {}
 	for field, value in pairs(spec) do
@@ -244,38 +270,38 @@ function BUILD.Button(kit, page, spec)
 end
 
 -- Landing page -----------------------------------------------------------------------
--- Header: name | version. Body: description and features. Footer: the
--- standard credit line.
+-- The addon's own entry in the AddOns list. Header: name | version. Body:
+-- description and features. Footer: the standard credit line.
 
-local function BuildLanding(kit, parent)
+local function BuildLanding(kit, canvas)
 	local config = kit.config
-	local title = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlightHuge")
-	title:SetPoint("TOPLEFT", 7, -14)
+	local title = canvas:CreateFontString(nil, "ARTWORK", "GameFontHighlightHuge")
+	title:SetPoint("TOPLEFT", 7, -22)
 	title:SetText(kit.title)
 
-	local separator = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlightHuge")
+	local separator = canvas:CreateFontString(nil, "ARTWORK", "GameFontHighlightHuge")
 	separator:SetPoint("LEFT", title, "RIGHT", 10, 0)
 	separator:SetTextColor(0.5, 0.5, 0.5)
 	separator:SetText("||")
 
-	local version = parent:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	local version = canvas:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 	version:SetPoint("LEFT", separator, "RIGHT", 10, 0)
 	version:SetText(kit.version and ("Version " .. kit.version) or "")
 
-	local divider = W.Divider(parent)
-	divider:SetPoint("TOPLEFT", 0, -44)
-	divider:SetPoint("TOPRIGHT", 0, -44)
+	local divider = W.Divider(canvas)
+	divider:SetPoint("TOPLEFT", 0, -50)
+	divider:SetPoint("TOPRIGHT", 0, -50)
 
-	local footerDivider = W.Divider(parent)
+	local footerDivider = W.Divider(canvas)
 	footerDivider:SetPoint("BOTTOMLEFT", 0, 34)
 	footerDivider:SetPoint("BOTTOMRIGHT", 0, 34)
 
-	local footer = parent:CreateFontString(nil, "ARTWORK", "GameFontDisable")
+	local footer = canvas:CreateFontString(nil, "ARTWORK", "GameFontDisable")
 	footer:SetPoint("BOTTOM", 0, 14)
 	footer:SetText(config.footer or SK.FOOTER)
 
-	local scroll, child = W.ScrollArea(parent)
-	scroll:SetPoint("TOPLEFT", 0, -52)
+	local scroll, child = W.ScrollArea(canvas)
+	scroll:SetPoint("TOPLEFT", 0, -58)
 	scroll:SetPoint("BOTTOMRIGHT", -24, 40)
 	local page = W.NewPage(child)
 	if config.description then
@@ -289,14 +315,17 @@ local function BuildLanding(kit, parent)
 		end
 		page:Text(table.concat(lines, "\n"))
 	end
+	if #kit.pageSpecs > 0 then
+		page:Text("The settings are in the sections listed under " .. kit.title .. " on the left.")
+	end
 	child:SetHeight(page:Height())
 	return page
 end
 
--- Profiles tab -----------------------------------------------------------------------
+-- Profiles page ----------------------------------------------------------------------
 
 local function BuildProfiles(kit, page)
-	page:Header("Profiles")
+	page:Header("Active Profile")
 	page:Text("A profile holds every setting of this addon. Each character remembers which profile it uses. "
 		.. "\"" .. Profiles.DEFAULT .. "\" starts with the default settings. Changes are saved to the active profile as you make them.")
 	page:Dropdown({
@@ -333,76 +362,30 @@ local function BuildProfiles(kit, page)
 			Profiles.PromptDelete(kit)
 		end,
 	})
+
+	page:Header("Export and Import")
+	page:Text("Export: the code below is the active profile. Click the box, then press Ctrl+C to copy it.\n"
+		.. "Import: paste a code into the box with Ctrl+V and click Import. It is saved as a new profile.")
+	local box = page:TextBox({
+		height = 90,
+		get = function()
+			return Profiles.Export(kit)
+		end,
+	})
+	page:Button({
+		label = "",
+		text = "Import",
+		tooltip = "Create a new profile from the code in the box.",
+		onClick = function()
+			Profiles.PromptImport(kit, box:GetText())
+		end,
+	})
 end
 
 -- Window -----------------------------------------------------------------------------
-
-local TAB_ROW_HEIGHT = 36
-
-local function BuildCanvas(kit, canvas)
-	local names = { kit.config.landingTab or "About" }
-	for _, spec in ipairs(kit.pageSpecs) do
-		names[#names + 1] = spec.name
-	end
-	names[#names + 1] = "Profiles"
-
-	local bodies = {}
-	local function Select(index)
-		for i, body in ipairs(bodies) do
-			body:SetShown(i == index)
-		end
-		kit.selectedTab = index
-	end
-
-	local tabs, selectTab = W.Tabs(canvas, names, Select)
-	kit.selectTab = selectTab
-	tabs:ClearAllPoints()
-	tabs:SetPoint("TOPLEFT", canvas, "TOPLEFT", 8, -6)
-
-	local function NewBody()
-		local body = CreateFrame("Frame", nil, canvas)
-		body:SetPoint("TOPLEFT", 0, -TAB_ROW_HEIGHT - 6)
-		body:SetPoint("BOTTOMRIGHT", 0, 0)
-		body:Hide()
-		bodies[#bodies + 1] = body
-		return body
-	end
-
-	local tabDivider = W.Divider(canvas)
-	tabDivider:SetPoint("TOPLEFT", 0, -TAB_ROW_HEIGHT - 2)
-	tabDivider:SetPoint("TOPRIGHT", 0, -TAB_ROW_HEIGHT - 2)
-
-	kit.pages[#kit.pages + 1] = BuildLanding(kit, NewBody())
-
-	local function ScrollingPage(body)
-		local scroll, child = W.ScrollArea(body)
-		scroll:SetPoint("TOPLEFT", 0, -4)
-		scroll:SetPoint("BOTTOMRIGHT", -24, 4)
-		return W.NewPage(child), child
-	end
-
-	for _, spec in ipairs(kit.pageSpecs) do
-		local page, child = ScrollingPage(NewBody())
-		for _, step in ipairs(spec.steps) do
-			if type(step.spec) == "table" then
-				CheckKey(kit, step.spec, step.method)
-			end
-			BUILD[step.method](kit, page, step.spec)
-		end
-		child:SetHeight(page:Height())
-		kit.pages[#kit.pages + 1] = page
-	end
-
-	local profilePage, profileChild = ScrollingPage(NewBody())
-	BuildProfiles(kit, profilePage)
-	profileChild:SetHeight(profilePage:Height())
-	kit.pages[#kit.pages + 1] = profilePage
-
-	canvas:SetScript("OnShow", function()
-		kit:Refresh()
-	end)
-	selectTab(1)
-end
+-- The landing page is the addon's entry in Options -> AddOns. Each page and
+-- Profiles are subcategories under it, which Blizzard's list shows as a
+-- collapsible sublist.
 
 -- Hooks the Settings panel calls on a canvas frame. Defaults resets the
 -- active profile.
@@ -414,20 +397,71 @@ local function AddPanelHooks(kit, canvas)
 		kit:ResetProfile()
 	end
 	canvas.OnCommit = function() end
+	canvas:SetScript("OnShow", function()
+		kit:Refresh()
+	end)
 end
 
-local function RegisterWithSettings(kit, canvas)
-	local category = Settings.RegisterCanvasLayoutCategory(canvas, kit.title)
+local function NewCanvas(kit, name)
+	local canvas = CreateFrame("Frame")
+	canvas:Hide()
+	canvas.name = name
+	AddPanelHooks(kit, canvas)
+	return canvas
+end
+
+-- A page with a title, a divider, and a scrolling body.
+local function BuildSettingsPage(kit, name, fill)
+	local canvas = NewCanvas(kit, name)
+	local top = W.PageTitle(canvas, name)
+	local scroll, child = W.ScrollArea(canvas)
+	scroll:SetPoint("TOPLEFT", 0, top - 4)
+	scroll:SetPoint("BOTTOMRIGHT", -24, 4)
+	local page = W.NewPage(child)
+	fill(page)
+	child:SetHeight(page:Height())
+	kit.pages[#kit.pages + 1] = page
+	return canvas
+end
+
+-- Returns the canvases: landing page first, then the pages, then Profiles.
+local function BuildCanvases(kit)
+	local canvases = {}
+	local landing = NewCanvas(kit, kit.title)
+	kit.pages[#kit.pages + 1] = BuildLanding(kit, landing)
+	canvases[1] = landing
+	for _, spec in ipairs(kit.pageSpecs) do
+		canvases[#canvases + 1] = BuildSettingsPage(kit, spec.name, function(page)
+			for _, step in ipairs(spec.steps) do
+				if type(step.spec) == "table" then
+					CheckKey(kit, step.spec, step.method)
+				end
+				BUILD[step.method](kit, page, step.spec)
+			end
+		end)
+	end
+	canvases[#canvases + 1] = BuildSettingsPage(kit, "Profiles", function(page)
+		BuildProfiles(kit, page)
+	end)
+	return canvases
+end
+
+local function RegisterWithSettings(kit, canvases)
+	local category = Settings.RegisterCanvasLayoutCategory(canvases[1], kit.title)
+	kit.categories = { category }
+	for i = 2, #canvases do
+		kit.categories[i] = Settings.RegisterCanvasLayoutSubcategory(category, canvases[i], canvases[i].name)
+	end
 	Settings.RegisterAddOnCategory(category)
 	kit.category = category
-	kit.widgetsUsed.window = "Settings"
+	kit.widgetsUsed.window = "Settings (subcategories)"
 end
 
--- No Settings API: the same canvas in a window of its own.
-local function BuildStandalone(kit, canvas)
+-- No Settings API: one window with the same list down the left.
+local function BuildStandalone(kit, canvases)
 	local name = "PSK_" .. addonName .. "_Options"
 	local window = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
-	window:SetSize(720, 600)
+	window:SetSize(860, 620)
 	window:SetPoint("CENTER")
 	window:SetFrameStrata("DIALOG")
 	window:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark", tile = true, tileSize = 32,
@@ -442,10 +476,26 @@ local function BuildStandalone(kit, canvas)
 	local close = CreateFrame("Button", nil, window, "UIPanelCloseButton")
 	close:SetPoint("TOPRIGHT", -6, -6)
 	tinsert(UISpecialFrames, name)
-	canvas:SetParent(window)
-	canvas:SetPoint("TOPLEFT", 16, -28)
-	canvas:SetPoint("BOTTOMRIGHT", -16, 16)
-	canvas:Show()
+
+	local function Select(index)
+		for i, canvas in ipairs(canvases) do
+			canvas:SetShown(i == index)
+		end
+	end
+	for i, canvas in ipairs(canvases) do
+		canvas:SetParent(window)
+		canvas:SetPoint("TOPLEFT", 200, -16)
+		canvas:SetPoint("BOTTOMRIGHT", -16, 16)
+		local button = CreateFrame("Button", nil, window, "UIPanelButtonTemplate")
+		button:SetSize(170, 24)
+		button:SetPoint("TOPLEFT", 20, -20 - (i - 1) * 28)
+		button:SetText((i == 1 and "" or "   ") .. canvas.name)
+		button:SetScript("OnClick", function()
+			Select(i)
+		end)
+	end
+	Select(1)
+	kit.selectPage = Select
 	kit.window = window
 	kit.widgetsUsed.window = "standalone"
 end
@@ -466,14 +516,12 @@ local function Init(kit)
 	W.Detect(kit.widgetsUsed)
 	Profiles.InitDialogs(kit)
 
-	local canvas = CreateFrame("Frame")
-	canvas:Hide()
-	AddPanelHooks(kit, canvas)
-	BuildCanvas(kit, canvas)
-	if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
-		RegisterWithSettings(kit, canvas)
+	local canvases = BuildCanvases(kit)
+	if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterCanvasLayoutSubcategory
+		and Settings.RegisterAddOnCategory then
+		RegisterWithSettings(kit, canvases)
 	else
-		BuildStandalone(kit, canvas)
+		BuildStandalone(kit, canvases)
 	end
 
 	Media.OnRegistered(function()
@@ -500,21 +548,22 @@ function Kit:OnReady(fn)
 	end
 end
 
-local function OpenNow(kit, tab)
+local function OpenNow(kit, index)
+	index = index or 1
 	if kit.window then
+		kit.selectPage(index)
 		kit.window:Show()
-	else
-		local id = kit.category.GetID and kit.category:GetID() or kit.category.ID
-		Settings.OpenToCategory(id)
+		return
 	end
-	if tab and kit.selectTab then
-		kit.selectTab(tab)
-	end
+	local category = kit.categories[index] or kit.category
+	local id = category.GetID and category:GetID() or category.ID
+	Settings.OpenToCategory(id)
 end
 
--- Opens the settings, on the given tab index if any. Waits for the end of
--- combat if needed.
-function Kit:Open(tab)
+-- Opens the settings: 1 (or nil) is the landing page, then the pages in the
+-- order they were added, then Profiles (see Kit:ProfilesIndex). Waits for the
+-- end of combat if needed.
+function Kit:Open(index)
 	if not self.ready then
 		return
 	end
@@ -522,8 +571,12 @@ function Kit:Open(tab)
 		self:Print("Settings open when combat ends.")
 	end
 	SK.Events.AfterCombat("openSettings", function()
-		OpenNow(self, tab)
+		OpenNow(self, index)
 	end)
+end
+
+function Kit:ProfilesIndex()
+	return #self.pageSpecs + 2
 end
 
 function Kit:ProbeRows()
@@ -536,7 +589,6 @@ end
 --   description        landing page text
 --   features           list of strings for the landing page
 --   footer             replaces the standard footer (leave unset to keep it)
---   landingTab         name of the first tab (default "About")
 --   savedVariable      name of the .toc's ## SavedVariables entry
 --   charSavedVariable  name of the .toc's ## SavedVariablesPerCharacter entry
 --   defaults           { key = value } (strings, numbers, booleans, tables)

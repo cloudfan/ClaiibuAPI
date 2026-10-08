@@ -16,6 +16,12 @@ local LSM_PREFIX = "lsm:"
 local BLIZZARD = "Blizzard"
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 
+-- Tints for stock borders. Apply them with SetBackdropBorderColor (or
+-- SetVertexColor); entries without a color are drawn white.
+local BRONZE = { 0.85, 0.6, 0.35, 1 }
+local GOLD = { 1, 0.82, 0.25, 1 }
+Media.WHITE_COLOR = { 1, 1, 1, 1 }
+
 -- The kinds are LibSharedMedia's media types.
 Media.KINDS = { "font", "statusbar", "border", "background", "sound" }
 Media.LABELS = {
@@ -51,7 +57,10 @@ Media.STOCK = {
 		{ key = "wood", label = "Achievement Wood", file = "Interface\\AchievementFrame\\UI-Achievement-WoodBorder" },
 		{ key = "party", label = "Party", file = "Interface\\CharacterFrame\\UI-Party-Border" },
 		{ key = "bubble", label = "Chat Bubble", file = "Interface\\Tooltips\\ChatBubble-Backdrop" },
+		{ key = "dialogbronze", label = "Dialog Bronze", file = "Interface\\DialogFrame\\UI-DialogBox-Border", color = BRONZE },
 		{ key = "toast", label = "Toast", file = "Interface\\FriendsFrame\\UI-Toast-Border" },
+		{ key = "toastbronze", label = "Toast Bronze", file = "Interface\\FriendsFrame\\UI-Toast-Border", color = BRONZE },
+		{ key = "toastgold", label = "Toast Gold", file = "Interface\\FriendsFrame\\UI-Toast-Border", color = GOLD },
 		{ key = "solid", label = "Solid", file = WHITE },
 		{ key = "none", label = "None" },
 	},
@@ -129,6 +138,7 @@ local stockByKey = {}
 for _, kind in ipairs(Media.KINDS) do
 	stockByKey[kind] = {}
 	for _, entry in ipairs(Media.STOCK[kind]) do
+		entry.color = entry.color or Media.WHITE_COLOR
 		stockByKey[kind][entry.key] = entry
 	end
 end
@@ -214,7 +224,8 @@ local function DefaultFontFile()
 	return "Fonts\\FRIZQT__.TTF"
 end
 
--- Returns { key, label, file, tile, tileSize, soundKit }. Fonts always have
+-- Returns { key, label, file, color, tile, tileSize, soundKit }. color is
+-- { r, g, b, a } (white unless the entry is tinted). Fonts always have
 -- a file. A border, background or sound may have none ("None"). Unknown keys
 -- and SharedMedia entries whose pack is gone give the kind's default.
 function Media.Get(kind, key)
@@ -226,16 +237,41 @@ function Media.Get(kind, key)
 		if data then
 			entry = lsmCache[kind][key]
 			if not entry or entry.file ~= data then
-				entry = { key = key, label = name, file = data }
+				entry = { key = key, label = name, file = data, color = Media.WHITE_COLOR }
 				lsmCache[kind][key] = entry
 			end
 		end
 	end
 	entry = entry or stockByKey[kind][Media.DEFAULT[kind]]
 	if kind == "font" and not entry.file then
-		return { key = entry.key, label = entry.label, file = DefaultFontFile() }
+		return { key = entry.key, label = entry.label, file = DefaultFontFile(), color = entry.color }
 	end
 	return entry
+end
+
+-- Font shadows. Saved values are these keys.
+Media.SHADOWS = {
+	{ key = "none", label = "None" },
+	{ key = "soft", label = "Soft", x = 1, y = -1, alpha = 0.6 },
+	{ key = "hard", label = "Hard", x = 1, y = -1, alpha = 1 },
+	{ key = "heavy", label = "Heavy", x = 2, y = -2, alpha = 1 },
+}
+local shadowByKey = {}
+for _, shadow in ipairs(Media.SHADOWS) do
+	shadowByKey[shadow.key] = shadow
+end
+
+-- Sets a FontString's font, size, flags and shadow from setting keys.
+function Media.ApplyFont(fontString, fontKey, size, shadowKey, flags)
+	fontString:SetFont(Media.Get("font", fontKey).file, size, flags or "")
+	local shadow = shadowByKey[shadowKey] or shadowByKey.none
+	if shadow.x then
+		fontString:SetShadowOffset(shadow.x, shadow.y)
+		fontString:SetShadowColor(0, 0, 0, shadow.alpha)
+	else
+		fontString:SetShadowOffset(0, 0)
+		fontString:SetShadowColor(0, 0, 0, 0)
+	end
 end
 
 -- Plays a sound key on the given channel ("Master" by default).

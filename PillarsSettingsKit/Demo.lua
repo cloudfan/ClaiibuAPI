@@ -14,9 +14,10 @@ local kit = SK.New({
 	description = "A standard settings window for Pillars addons. This demo shows every control the kit offers, "
 		.. "and a small preview panel that uses the chosen media.",
 	features = {
-		"Tabs, sliders, checkboxes and dropdowns from Blizzard's own settings templates",
+		"Pages listed under the addon in Options -> AddOns, as a collapsible sublist",
+		"Sliders, checkboxes and dropdowns from Blizzard's own settings templates",
 		"Dropdowns with left and right steppers, listing Blizzard media first, then each LibSharedMedia pack under its own heading",
-		"Profiles saved as compact strings, shared across characters",
+		"Profiles saved as compact strings, shared across characters, with export and import",
 		"A landing page with the name, version, description and features",
 	},
 	savedVariable = "PillarsSettingsKitDB",
@@ -27,6 +28,7 @@ local kit = SK.New({
 		height = 24,
 		fontSize = 13,
 		font = "default",
+		fontShadow = "soft",
 		barTexture = "blizzard",
 		border = "tooltip",
 		borderSize = 12,
@@ -69,6 +71,7 @@ local style = kit:AddPage("Style")
 style:Header("Media")
 style:MediaDropdown({ key = "font", mediaType = "font" })
 style:Slider({ key = "fontSize", label = "Font Size", min = 8, max = 24, step = 1 })
+style:FontShadow({ key = "fontShadow" })
 style:MediaDropdown({ key = "barTexture", mediaType = "statusbar" })
 style:MediaDropdown({ key = "border", mediaType = "border" })
 style:Slider({ key = "borderSize", label = "Border Size", min = 1, max = 32, step = 1 })
@@ -138,6 +141,8 @@ function Demo.Apply()
 		edgeSize = edge,
 		insets = { left = inset, right = inset, top = inset, bottom = inset },
 	})
+	local tint = border.color
+	panel:SetBackdropBorderColor(tint[1], tint[2], tint[3], tint[4])
 	if background.key == "solid" then
 		panel:SetBackdropColor(0, 0, 0, 0.8)
 	else
@@ -150,8 +155,7 @@ function Demo.Apply()
 	panel.bar:SetStatusBarTexture(kit:GetMedia("statusbar", "barTexture").file)
 	panel.bar:SetStatusBarColor(0.1, 0.7, 0.1)
 
-	local font = kit:GetMedia("font", "font")
-	panel.text:SetFont(font.file, s.fontSize, "OUTLINE")
+	kit:ApplyFont(panel.text, "font", "fontSize", "fontShadow")
 end
 
 kit:OnReady(Demo.Apply)
@@ -173,11 +177,11 @@ slash.probe = function()
 end
 
 slash.profiles = function()
-	kit:Open(#kit.pageSpecs + 2) -- About, the pages, then Profiles
+	kit:Open(kit:ProfilesIndex())
 end
 
 slash.help = function()
-	kit:Print("/psk - settings, /psk profiles - profiles tab, /psk probe - API check")
+	kit:Print("/psk - settings, /psk profiles - profiles, /psk probe - API check")
 end
 
 SLASH_PILLARSSETTINGSKIT1 = "/psk"

@@ -37,7 +37,7 @@ jobs:
         run: |
           mkdir -p dist
           cp -r PillarsSettingsKit dist/
-          cp README.md dist/PillarsSettingsKit/
+          cp README.md AI_PROMPT.md dist/PillarsSettingsKit/
           cd dist && zip -r "PillarsSettingsKit-${TAG}.zip" PillarsSettingsKit
 
       - name: Publish the release

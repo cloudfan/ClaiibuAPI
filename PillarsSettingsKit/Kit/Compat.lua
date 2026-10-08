@@ -100,8 +100,8 @@ function C.ProbeRows(kit)
 		"Settings.RegisterAddOnCategory: " .. Has(Settings and Settings.RegisterAddOnCategory),
 		"Settings.OpenToCategory: " .. Has(Settings and Settings.OpenToCategory),
 		"C_XMLUtil.GetTemplateInfo: " .. Has(C_XMLUtil and C_XMLUtil.GetTemplateInfo),
-		"TabSystemTemplate: " .. Known(C.TemplateExists("TabSystemTemplate")),
-		"PanelTopTabButtonTemplate: " .. Known(C.TemplateExists("PanelTopTabButtonTemplate")),
+		"Settings.RegisterCanvasLayoutSubcategory: " .. Has(Settings and Settings.RegisterCanvasLayoutSubcategory),
+		"InputScrollFrameTemplate: " .. Known(C.TemplateExists("InputScrollFrameTemplate")),
 		"SettingsDropdownWithButtonsTemplate: " .. Known(C.TemplateExists("SettingsDropdownWithButtonsTemplate")),
 		"WowStyle1DropdownTemplate: " .. Known(C.TemplateExists("WowStyle1DropdownTemplate")),
 		"MinimalSliderWithSteppersTemplate: " .. Known(C.TemplateExists("MinimalSliderWithSteppersTemplate")),
@@ -115,9 +115,9 @@ function C.ProbeRows(kit)
 	}
 	if kit then
 		local used = kit.widgetsUsed or {}
-		rows[#rows + 1] = "Kit is using: tabs=" .. tostring(used.tabs) .. ", dropdown=" .. tostring(used.dropdown)
+		rows[#rows + 1] = "Kit is using: window=" .. tostring(used.window) .. ", dropdown=" .. tostring(used.dropdown)
 			.. ", slider=" .. tostring(used.slider) .. ", checkbox=" .. tostring(used.checkbox)
-			.. ", dialogs=" .. tostring(used.dialogs) .. ", window=" .. tostring(used.window)
+			.. ", dialogs=" .. tostring(used.dialogs) .. ", text box=" .. tostring(used.textBox)
 		rows[#rows + 1] = "Active profile: " .. tostring(kit:GetActiveProfile())
 	end
 	rows[#rows + 1] = "Player name is secret: " .. (C.IsSecret(UnitName("player")) and "yes" or "no")
