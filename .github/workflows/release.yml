@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to create and release, e.g. v0.1.0"
+        required: true
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches the .toc version
+        run: |
+          version="${TAG#v}"
+          grep -qx "## Version: ${version}" PillarsSettingsKit/PillarsSettingsKit.toc \
+            || { echo "Tag ${TAG} does not match ## Version in PillarsSettingsKit/PillarsSettingsKit.toc"; exit 1; }
+
+      - name: Check the Lua compiles (Lua 5.1)
+        run: |
+          sudo apt-get install -y lua5.1 >/dev/null
+          find PillarsSettingsKit -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
+
+      - name: Build the addon zip
+        run: |
+          mkdir -p dist
+          cp -r PillarsSettingsKit dist/
+          cp README.md dist/PillarsSettingsKit/
+          cd dist && zip -r "PillarsSettingsKit-${TAG}.zip" PillarsSettingsKit
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # On a manual run the tag does not exist yet; --target creates it here.
+          gh release create "$TAG" "dist/PillarsSettingsKit-${TAG}.zip" \
+            --target "$GITHUB_SHA" \
+            --title "Pillars Settings Kit ${TAG}" \
+            --prerelease \
+            --notes "Settings framework and demo addon for WoW: Forever (## Interface: 16001). Not yet tested in-game; run /psk probe on your build.
+
+          Unzip into World of Warcraft\\_classic_beta_\\Interface\\AddOns\\ so the folder is AddOns\\PillarsSettingsKit\\. Restart the client if the addon does not appear.
+
+          To use the kit in your own addon, copy the Kit folder and follow README.md."
