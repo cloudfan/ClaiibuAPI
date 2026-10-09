@@ -8,6 +8,7 @@ Shared code for World of Warcraft: Forever addons (`## Interface: 16001`). Claii
 | `ClaiibuAPIDemo/` | A demo addon that uses every feature, and the template for a new addon. |
 | `AI_PROMPT.md` | A prompt that has an AI add ClaiibuAPI to an addon. |
 | `AI_GUIDE.md` | A prompt that has an AI explain how to use each feature. |
+| `MIGRATIONS.md` | Prompts that have an AI update an existing addon after an API change, one per version. |
 
 ## What it gives an addon
 
@@ -148,7 +149,7 @@ Every `key` must exist in `defaults`, with a value of the same type. A page that
 
 - Add features without changing existing calls, so addons keep working.
 - If a change could break an addon written for the current `API_LEVEL`, raise `API_LEVEL` in `ClaiibuAPI/API.lua` and say so in the release notes. Addons ask for a level with `ClaiibuAPI.Require`.
-- Keep `AI_PROMPT.md` and `AI_GUIDE.md` in step with every change. `CLAUDE.md` asks AI assistants working in this repository to do that.
+- Keep `AI_PROMPT.md` and `AI_GUIDE.md` in step with every change, and add an update prompt to `MIGRATIONS.md` whenever an API function is added, changed or removed. `CLAUDE.md` asks AI assistants working in this repository to do that.
 - To release, bump `## Version` in `ClaiibuAPI/ClaiibuAPI.toc` and run the Release workflow (or push a `vX.Y.Z` tag).
 
 ## Not yet verified on Forever

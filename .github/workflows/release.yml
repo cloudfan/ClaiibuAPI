@@ -37,7 +37,7 @@ jobs:
         run: |
           mkdir -p dist
           cp -r ClaiibuAPI ClaiibuAPIDemo dist/
-          cp README.md AI_PROMPT.md AI_GUIDE.md dist/ClaiibuAPI/
+          cp README.md AI_PROMPT.md AI_GUIDE.md MIGRATIONS.md dist/ClaiibuAPI/
           cd dist && zip -r "ClaiibuAPI-${TAG}.zip" ClaiibuAPI ClaiibuAPIDemo
 
       - name: Publish the release
