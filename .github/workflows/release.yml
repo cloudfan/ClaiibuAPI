@@ -25,32 +25,32 @@ jobs:
       - name: Check the tag matches the .toc version
         run: |
           version="${TAG#v}"
-          grep -qx "## Version: ${version}" PillarsSettingsKit/PillarsSettingsKit.toc \
-            || { echo "Tag ${TAG} does not match ## Version in PillarsSettingsKit/PillarsSettingsKit.toc"; exit 1; }
+          grep -qx "## Version: ${version}" ClaiibuAPI/ClaiibuAPI.toc \
+            || { echo "Tag ${TAG} does not match ## Version in ClaiibuAPI/ClaiibuAPI.toc"; exit 1; }
 
       - name: Check the Lua compiles (Lua 5.1)
         run: |
           sudo apt-get install -y lua5.1 >/dev/null
-          find PillarsSettingsKit -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
+          find ClaiibuAPI ClaiibuAPIDemo -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
 
       - name: Build the addon zip
         run: |
           mkdir -p dist
-          cp -r PillarsSettingsKit dist/
-          cp README.md AI_PROMPT.md dist/PillarsSettingsKit/
-          cd dist && zip -r "PillarsSettingsKit-${TAG}.zip" PillarsSettingsKit
+          cp -r ClaiibuAPI ClaiibuAPIDemo dist/
+          cp README.md AI_PROMPT.md AI_GUIDE.md dist/ClaiibuAPI/
+          cd dist && zip -r "ClaiibuAPI-${TAG}.zip" ClaiibuAPI ClaiibuAPIDemo
 
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           # On a manual run the tag does not exist yet; --target creates it here.
-          gh release create "$TAG" "dist/PillarsSettingsKit-${TAG}.zip" \
+          gh release create "$TAG" "dist/ClaiibuAPI-${TAG}.zip" \
             --target "$GITHUB_SHA" \
-            --title "Pillars Settings Kit ${TAG}" \
+            --title "ClaiibuAPI ${TAG}" \
             --prerelease \
-            --notes "Settings framework and demo addon for WoW: Forever (## Interface: 16001). Not yet tested in-game; run /psk probe on your build.
+            --notes "ClaiibuAPI, a dependency addon for WoW: Forever (## Interface: 16001), plus ClaiibuAPIDemo. Not yet tested in-game; run /capi probe on your build.
 
-          Unzip into World of Warcraft\\_classic_beta_\\Interface\\AddOns\\ so the folder is AddOns\\PillarsSettingsKit\\. Restart the client if the addon does not appear.
+          Unzip into World of Warcraft\\_classic_beta_\\Interface\\AddOns\\ so you have AddOns\\ClaiibuAPI\\ and AddOns\\ClaiibuAPIDemo\\. Players need ClaiibuAPI plus the addons that use it; the demo is optional. Restart the client if an addon does not appear.
 
-          To use the kit in your own addon, copy the Kit folder and follow README.md."
+          Addons use it with ## Dependencies: ClaiibuAPI. See README.md, AI_PROMPT.md and AI_GUIDE.md inside the ClaiibuAPI folder."

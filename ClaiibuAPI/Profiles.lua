@@ -194,9 +194,13 @@ end
 -- StaticPopup, as Blizzard's own confirmations use. A client without it gets
 -- a small dialog built from Blizzard templates.
 
-local POPUP_SAVE = "PSK_" .. addonName:upper() .. "_SAVE_PROFILE"
-local POPUP_OVERWRITE = "PSK_" .. addonName:upper() .. "_OVERWRITE_PROFILE"
-local POPUP_DELETE = "PSK_" .. addonName:upper() .. "_DELETE_PROFILE"
+-- StaticPopup names carry the owning addon's name, so every addon that uses
+-- the API has its own three dialogs.
+local function PopupNames(kit)
+	local prefix = "CLAIIBUAPI_" .. kit.addonName:upper()
+	return { save = prefix .. "_SAVE_PROFILE", overwrite = prefix .. "_OVERWRITE_PROFILE",
+		delete = prefix .. "_DELETE_PROFILE" }
+end
 
 local function EditBoxOf(dialog)
 	if not dialog then
@@ -267,6 +271,7 @@ local function UsePopups()
 end
 
 local function RegisterPopups(kit)
+	local POPUP_SAVE, POPUP_OVERWRITE, POPUP_DELETE = kit.popups.save, kit.popups.overwrite, kit.popups.delete
 	StaticPopupDialogs[POPUP_SAVE] = {
 		text = "Save %s as a new profile named:",
 		button1 = SAVE or "Save",
@@ -327,11 +332,12 @@ local function RegisterPopups(kit)
 end
 
 function Profiles.InitDialogs(kit)
+	kit.popups = PopupNames(kit)
 	if UsePopups() then
 		RegisterPopups(kit)
-		kit.widgetsUsed.dialogs = "StaticPopup"
+		SK.Widgets.used.dialogs = "StaticPopup"
 	else
-		kit.widgetsUsed.dialogs = "fallback"
+		SK.Widgets.used.dialogs = "fallback"
 	end
 end
 
@@ -340,7 +346,7 @@ function Profiles.PromptSave(kit, text, default)
 	default = default or C.CharacterProfileName()
 	local what = text and "the imported settings" or "the current settings"
 	if UsePopups() then
-		StaticPopup_Show(POPUP_SAVE, what, nil, { default = default, text = text })
+		StaticPopup_Show(kit.popups.save, what, nil, { default = default, text = text })
 		return
 	end
 	ShowFallback({
@@ -356,7 +362,7 @@ end
 
 function Profiles.PromptOverwrite(kit, name, text)
 	if UsePopups() then
-		StaticPopup_Show(POPUP_OVERWRITE, name, nil, { name = name, text = text })
+		StaticPopup_Show(kit.popups.overwrite, name, nil, { name = name, text = text })
 		return
 	end
 	ShowFallback({
@@ -384,7 +390,7 @@ end
 function Profiles.PromptDelete(kit)
 	local name = Profiles.Active(kit)
 	if UsePopups() then
-		StaticPopup_Show(POPUP_DELETE, name, nil, { name = name })
+		StaticPopup_Show(kit.popups.delete, name, nil, { name = name })
 		return
 	end
 	ShowFallback({

@@ -112,12 +112,14 @@ function C.ProbeRows(kit)
 		"SOUNDKIT: " .. Has(SOUNDKIT),
 		"C_AddOns.GetAddOnMetadata: " .. Has(C_AddOns and C_AddOns.GetAddOnMetadata),
 		"LibSharedMedia-3.0: " .. (SK.Media.LSM() and "loaded" or "not loaded (optional)"),
+		"ClaiibuAPI version: " .. tostring(ClaiibuAPI and ClaiibuAPI.VERSION) .. ", API level " .. tostring(ClaiibuAPI and ClaiibuAPI.API_LEVEL),
 	}
 	if kit then
-		local used = kit.widgetsUsed or {}
+		local used = SK.Widgets.used
 		rows[#rows + 1] = "Kit is using: window=" .. tostring(used.window) .. ", dropdown=" .. tostring(used.dropdown)
 			.. ", slider=" .. tostring(used.slider) .. ", checkbox=" .. tostring(used.checkbox)
 			.. ", dialogs=" .. tostring(used.dialogs) .. ", text box=" .. tostring(used.textBox)
+		rows[#rows + 1] = "Settings for: " .. kit.addonName
 		rows[#rows + 1] = "Active profile: " .. tostring(kit:GetActiveProfile())
 	end
 	rows[#rows + 1] = "Player name is secret: " .. (C.IsSecret(UnitName("player")) and "yes" or "no")

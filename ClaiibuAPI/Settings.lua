@@ -1,9 +1,10 @@
 local addonName, ns = ...
 
--- The settings: one entry in Options -> AddOns (the landing page) with a
--- collapsible sublist under it: the addon's own pages, then Profiles.
+-- Settings for any addon that depends on ClaiibuAPI: one entry in
+-- Options -> AddOns (the landing page) with a collapsible sublist under it:
+-- the addon's own pages, then Profiles.
 --
---   local kit = ns.SettingsKit.New({ ... })   -- at file scope
+--   local kit = ClaiibuAPI.Settings.New(addonName, { ... })   -- at file scope
 --   local page = kit:AddPage("General")
 --   page:Checkbox({ key = "locked", label = "Lock Frames" })
 --
@@ -16,6 +17,28 @@ local Profiles = SK.Profiles
 local Serializer = SK.Serializer
 
 SK.FOOTER = "Created for use by a lazy sack of shit, Maiibu. (And Friends)"
+
+-- Anchor points, in the order the selector lists them. The keys are the
+-- point names SetPoint takes.
+SK.ANCHORS = {
+	{ key = "TOPLEFT", label = "TOP LEFT" },
+	{ key = "TOP", label = "TOP CENTER" },
+	{ key = "TOPRIGHT", label = "TOP RIGHT" },
+	{ key = "LEFT", label = "LEFT CENTER" },
+	{ key = "CENTER", label = "CENTER" },
+	{ key = "RIGHT", label = "RIGHT CENTER" },
+	{ key = "BOTTOMLEFT", label = "BOTTOM LEFT" },
+	{ key = "BOTTOM", label = "BOTTOM CENTER" },
+	{ key = "BOTTOMRIGHT", label = "BOTTOM RIGHT" },
+}
+local anchorKeys = {}
+for _, anchor in ipairs(SK.ANCHORS) do
+	anchorKeys[anchor.key] = true
+end
+
+-- Every kit, by the name of the addon it belongs to.
+local kits = {}
+SK.kits = kits
 
 local Kit = {}
 Kit.__index = Kit
@@ -67,6 +90,12 @@ function PageSpec:FontShadow(spec)
 	return Add(self, "FontShadow", spec)
 end
 
+-- spec: key, label (default "Anchor Point"), tooltip. Values are SetPoint
+-- names ("TOPLEFT" ... "BOTTOMRIGHT"); apply them with kit:ApplyAnchor.
+function PageSpec:Anchor(spec)
+	return Add(self, "Anchor", spec)
+end
+
 -- spec: label, text, tooltip, width, onClick(kit), enabled(kit)
 function PageSpec:Button(spec)
 	return Add(self, "Button", spec)
@@ -99,11 +128,11 @@ end
 -- must have the default's type.
 function Kit:Set(key, value)
 	if not self.ready then
-		error(addonName .. ": settings are not loaded yet; use kit:OnReady", 2)
+		error(self.addonName .. ": settings are not loaded yet; use kit:OnReady", 2)
 	end
 	local default = self.defaults[key]
 	if default == nil or type(value) ~= type(default) then
-		error(addonName .. ": no setting " .. tostring(key) .. " of type " .. type(value), 2)
+		error(self.addonName .. ": no setting " .. tostring(key) .. " of type " .. type(value), 2)
 	end
 	self.settings[key] = value
 	Changed(self, key, value)
@@ -125,6 +154,26 @@ function Kit:ApplyFont(fontString, fontKey, size, shadowKey, flags)
 		shadowKey and self.settings[shadowKey] or "none", flags)
 end
 
+-- Places frame by settings: kit:ApplyAnchor(frame, "point", "x", "y").
+-- The frame's point and the parent's point are the same, so "TOPLEFT" puts
+-- the frame in the parent's top left corner. relativeTo defaults to
+-- UIParent; x and y may be setting keys or numbers. Unknown points give
+-- CENTER. Check InCombatLockdown() first if the frame is protected.
+function Kit:ApplyAnchor(frame, pointKey, x, y, relativeTo)
+	local point = self.settings[pointKey]
+	if not anchorKeys[point] then
+		point = "CENTER"
+	end
+	if type(x) == "string" then
+		x = self.settings[x]
+	end
+	if type(y) == "string" then
+		y = self.settings[y]
+	end
+	frame:ClearAllPoints()
+	frame:SetPoint(point, relativeTo or UIParent, point, x or 0, y or 0)
+end
+
 function Kit:PlaySound(key, channel)
 	Media.PlaySound(self.settings[key], channel)
 end
@@ -138,7 +187,7 @@ function Kit:ProfileChanged()
 		self.config.onProfileChanged(self)
 	end
 	-- After the menu or dialog that asked for it has closed.
-	SK.Events.Defer("profileRefresh", function()
+	self.events.Defer("profileRefresh", function()
 		self:Refresh()
 	end)
 end
@@ -189,7 +238,7 @@ end
 
 local function CheckKey(kit, spec, method)
 	if spec.key ~= nil and kit.defaults[spec.key] == nil then
-		error(addonName .. ": " .. method .. " \"" .. tostring(spec.label) .. "\" uses key \""
+		error(kit.addonName .. ": " .. method .. " \"" .. tostring(spec.label) .. "\" uses key \""
 			.. tostring(spec.key) .. "\", which is not in the defaults", 0)
 	end
 end
@@ -224,7 +273,7 @@ end
 function BUILD.MediaDropdown(kit, page, spec)
 	local kind = spec.mediaType
 	if not Media.LABELS[kind] then
-		error(addonName .. ": unknown mediaType " .. tostring(kind), 0)
+		error(kit.addonName .. ": unknown mediaType " .. tostring(kind), 0)
 	end
 	local bound = Bind(kit, spec)
 	bound.label = spec.label or Media.LABELS[kind]
@@ -249,6 +298,15 @@ function BUILD.FontShadow(kit, page, spec)
 	bound.label = spec.label or "Font Shadow"
 	bound.options = function()
 		return Media.SHADOWS
+	end
+	page:Dropdown(bound)
+end
+
+function BUILD.Anchor(kit, page, spec)
+	local bound = Bind(kit, spec)
+	bound.label = spec.label or "Anchor Point"
+	bound.options = function()
+		return SK.ANCHORS
 	end
 	page:Dropdown(bound)
 end
@@ -454,12 +512,12 @@ local function RegisterWithSettings(kit, canvases)
 	end
 	Settings.RegisterAddOnCategory(category)
 	kit.category = category
-	kit.widgetsUsed.window = "Settings (subcategories)"
+	W.used.window = "Settings (subcategories)"
 end
 
 -- No Settings API: one window with the same list down the left.
 local function BuildStandalone(kit, canvases)
-	local name = "PSK_" .. addonName .. "_Options"
+	local name = "ClaiibuAPI_" .. kit.addonName .. "_Options"
 	local window = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
 	window:SetSize(860, 620)
 	window:SetPoint("CENTER")
@@ -497,7 +555,7 @@ local function BuildStandalone(kit, canvases)
 	Select(1)
 	kit.selectPage = Select
 	kit.window = window
-	kit.widgetsUsed.window = "standalone"
+	W.used.window = "standalone"
 end
 
 local function Init(kit)
@@ -513,7 +571,7 @@ local function Init(kit)
 	Profiles.Load(kit)
 	Profiles.Flush(kit)
 
-	W.Detect(kit.widgetsUsed)
+	W.Detect()
 	Profiles.InitDialogs(kit)
 
 	local canvases = BuildCanvases(kit)
@@ -570,7 +628,7 @@ function Kit:Open(index)
 	if InCombatLockdown() then
 		self:Print("Settings open when combat ends.")
 	end
-	SK.Events.AfterCombat("openSettings", function()
+	self.events.AfterCombat("openSettings", function()
 		OpenNow(self, index)
 	end)
 end
@@ -583,7 +641,7 @@ function Kit:ProbeRows()
 	return C.ProbeRows(self)
 end
 
--- config:
+-- ClaiibuAPI.Settings.New(addonName, config). config:
 --   title              shown in Options -> AddOns and on the landing page
 --   version            defaults to the .toc's ## Version
 --   description        landing page text
@@ -595,30 +653,33 @@ end
 --   onChange(key, value, kit)    after any setting changes
 --   onProfileChanged(kit)        after the active profile changes or is reset
 --   onMediaRegistered(kit)       after a SharedMedia pack registers media
-function SK.New(config)
-	if SK.instance then
-		error(addonName .. ": ns.SettingsKit.New can be called once per addon", 2)
+function SK.New(owner, config)
+	assert(type(owner) == "string", "ClaiibuAPI.Settings.New(addonName, config): pass your addon's name first (local addonName = ...)")
+	if kits[owner] then
+		error(owner .. ": ClaiibuAPI.Settings.New can be called once per addon", 2)
 	end
-	assert(type(config) == "table", "SettingsKit.New needs a config table")
-	assert(type(config.savedVariable) == "string", "SettingsKit.New needs savedVariable")
-	assert(type(config.charSavedVariable) == "string", "SettingsKit.New needs charSavedVariable")
-	assert(type(config.defaults) == "table", "SettingsKit.New needs defaults")
+	assert(type(config) == "table", owner .. ": Settings.New needs a config table")
+	assert(type(config.savedVariable) == "string", owner .. ": Settings.New needs savedVariable")
+	assert(type(config.charSavedVariable) == "string", owner .. ": Settings.New needs charSavedVariable")
+	assert(type(config.defaults) == "table", owner .. ": Settings.New needs defaults")
 
 	local kit = setmetatable({
+		addonName = owner,
 		config = config,
-		title = config.title or C.AddOnTitle(addonName),
-		version = config.version or C.Metadata(addonName, "Version"),
+		title = config.title or C.AddOnTitle(owner),
+		version = config.version or C.Metadata(owner, "Version"),
 		defaults = Serializer.DeepCopy(config.defaults),
 		pageSpecs = {},
 		pages = {},
 		readyQueue = {},
-		widgetsUsed = {},
+		-- The owning addon's own event frame. The addon may use it too.
+		events = SK.NewEvents(),
 	}, Kit)
-	SK.instance = kit
+	kits[owner] = kit
 
-	SK.Events.Register({
+	kit.events.Register({
 		ADDON_LOADED = function(name)
-			if name == addonName and not kit.ready then
+			if name == owner and not kit.ready then
 				Init(kit)
 			end
 		end,

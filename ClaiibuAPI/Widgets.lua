@@ -20,10 +20,16 @@ W.TOP = -8
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 local STEPPER_ATLAS = { "Minimal_SliderBar_Button_Left", "Minimal_SliderBar_Button_Right" }
 
--- Which Blizzard templates this client has. Filled in by W.Detect.
+-- Which Blizzard templates this client has, and which ones the widgets
+-- ended up using (for the probe). Filled in by W.Detect, once.
 local native = {}
+W.used = {}
 
-function W.Detect(used)
+function W.Detect()
+	if native.detected then
+		return
+	end
+	native.detected = true
 	native.inputScroll = C.HasTemplate("InputScrollFrameTemplate")
 	native.dropdown = C.HasTemplate("WowStyle1DropdownTemplate")
 	native.dropdownWithButtons = C.HasTemplate("SettingsDropdownWithButtonsTemplate")
@@ -32,7 +38,6 @@ function W.Detect(used)
 	native.uiCheck = C.HasTemplate("UICheckButtonTemplate")
 	native.scroll = C.HasTemplate("ScrollFrameTemplate")
 	native.panelScroll = C.HasTemplate("UIPanelScrollFrameTemplate")
-	W.used = used
 end
 
 local function Tooltip()

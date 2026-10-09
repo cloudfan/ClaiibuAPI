@@ -1,40 +1,45 @@
 local addonName, ns = ...
 
--- The demo, and the template for a new addon: declare the settings, build
--- the pages, and react to changes. Copy this file and the Kit folder into a
--- new addon and replace what is below.
-local SK = ns.SettingsKit
-local Events = SK.Events
+-- The demo, and the template for a new addon that depends on ClaiibuAPI:
+-- declare the settings, build the pages, and react to changes. Copy this
+-- addon, rename it, and replace what is below. The .toc needs
+-- "## Dependencies: ClaiibuAPI" and its own two saved variables.
+local API = ClaiibuAPI and ClaiibuAPI.Require(1, addonName)
+if not API then
+	return
+end
 
 local Demo = {}
 ns.Demo = Demo
 
-local kit = SK.New({
-	title = "Pillars Settings Kit",
-	description = "A standard settings window for Pillars addons. This demo shows every control the kit offers, "
-		.. "and a small preview panel that uses the chosen media.",
+local kit = API.Settings.New(addonName, {
+	title = "ClaiibuAPI Demo",
+	description = "Every control ClaiibuAPI offers, and a small preview panel that uses the chosen settings. "
+		.. "Copy this addon to start a new one.",
 	features = {
 		"Pages listed under the addon in Options -> AddOns, as a collapsible sublist",
 		"Sliders, checkboxes and dropdowns from Blizzard's own settings templates",
 		"Dropdowns with left and right steppers, listing Blizzard media first, then each LibSharedMedia pack under its own heading",
+		"Anchor point and font shadow selectors",
 		"Profiles saved as compact strings, shared across characters, with export and import",
-		"A landing page with the name, version, description and features",
 	},
-	savedVariable = "PillarsSettingsKitDB",
-	charSavedVariable = "PillarsSettingsKitCharDB",
+	savedVariable = "ClaiibuAPIDemoDB",
+	charSavedVariable = "ClaiibuAPIDemoCharDB",
 	defaults = {
 		showPreview = false,
+		point = "CENTER",
+		x = 0,
+		y = 120,
 		width = 220,
 		height = 24,
-		fontSize = 13,
 		font = "default",
+		fontSize = 13,
 		fontShadow = "soft",
 		barTexture = "blizzard",
 		border = "tooltip",
 		borderSize = 12,
 		background = "solid",
 		alertSound = "readycheck",
-		anchor = "center",
 	},
 	onChange = function()
 		Demo.Apply()
@@ -52,26 +57,21 @@ Demo.kit = kit
 
 local general = kit:AddPage("General")
 general:Header("Preview")
-general:Checkbox({ key = "showPreview", label = "Show Preview Panel", tooltip = "A small panel near the middle of the screen that uses the settings below." })
-general:Dropdown({
-	key = "anchor",
-	label = "Position",
-	tooltip = "Where the preview panel sits.",
-	options = {
-		{ key = "center", label = "Center" },
-		{ key = "top", label = "Top" },
-		{ key = "bottom", label = "Bottom" },
-	},
-})
+general:Checkbox({ key = "showPreview", label = "Show Preview Panel", tooltip = "A small panel that uses the settings below." })
+general:Header("Position")
+general:Anchor({ key = "point", tooltip = "The corner or edge of the screen the panel is attached to." })
+general:Slider({ key = "x", label = "X Offset", min = -800, max = 800, step = 5 })
+general:Slider({ key = "y", label = "Y Offset", min = -500, max = 500, step = 5 })
 general:Header("Size")
 general:Slider({ key = "width", label = "Width", min = 100, max = 400, step = 10 })
 general:Slider({ key = "height", label = "Height", min = 12, max = 60, step = 1 })
 
 local style = kit:AddPage("Style")
-style:Header("Media")
+style:Header("Text")
 style:MediaDropdown({ key = "font", mediaType = "font" })
 style:Slider({ key = "fontSize", label = "Font Size", min = 8, max = 24, step = 1 })
 style:FontShadow({ key = "fontShadow" })
+style:Header("Frame")
 style:MediaDropdown({ key = "barTexture", mediaType = "statusbar" })
 style:MediaDropdown({ key = "border", mediaType = "border" })
 style:Slider({ key = "borderSize", label = "Border Size", min = 1, max = 32, step = 1 })
@@ -90,12 +90,6 @@ style:Text("Media registered with LibSharedMedia-3.0 appears in these lists unde
 -- Preview panel ----------------------------------------------------------------------
 -- Plain frames, not protected. The bar shows a fixed value, not unit data.
 
-local ANCHORS = {
-	center = { "CENTER", 0, 120 },
-	top = { "TOP", 0, -160 },
-	bottom = { "BOTTOM", 0, 260 },
-}
-
 local panel
 
 local function BuildPanel()
@@ -106,7 +100,7 @@ local function BuildPanel()
 	panel.bar:SetValue(0.65)
 	panel.text = panel.bar:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	panel.text:SetPoint("CENTER")
-	panel.text:SetText("Pillars Settings Kit")
+	panel.text:SetText("ClaiibuAPI Demo")
 end
 
 function Demo.Apply()
@@ -125,9 +119,7 @@ function Demo.Apply()
 		return
 	end
 	panel:SetSize(s.width, s.height)
-	local anchor = ANCHORS[s.anchor] or ANCHORS.center
-	panel:ClearAllPoints()
-	panel:SetPoint(anchor[1], UIParent, anchor[1], anchor[2], anchor[3])
+	kit:ApplyAnchor(panel, "point", "x", "y")
 
 	local border = kit:GetMedia("border", "border")
 	local background = kit:GetMedia("background", "background")
@@ -160,6 +152,9 @@ end
 
 kit:OnReady(Demo.Apply)
 
+-- Keeps the preview in step with media that loads late.
+kit.events.On("PLAYER_LOGIN", Demo.Apply)
+
 -- Slash commands ----------------------------------------------------------------------
 
 local slash = {}
@@ -168,24 +163,23 @@ slash[""] = function()
 	kit:Open()
 end
 
-slash.probe = function()
-	kit:Print("Capability probe:")
-	local rows = kit:ProbeRows()
-	for i = 1, #rows do
-		print("  " .. rows[i])
-	end
-end
-
 slash.profiles = function()
 	kit:Open(kit:ProfilesIndex())
 end
 
-slash.help = function()
-	kit:Print("/psk - settings, /psk profiles - profiles, /psk probe - API check")
+slash.probe = function()
+	kit:Print("Capability probe:")
+	for _, row in ipairs(kit:ProbeRows()) do
+		print("  " .. row)
+	end
 end
 
-SLASH_PILLARSSETTINGSKIT1 = "/psk"
-SlashCmdList.PILLARSSETTINGSKIT = function(msg)
+slash.help = function()
+	kit:Print("/capi - settings, /capi profiles - profiles, /capi probe - API check")
+end
+
+SLASH_CLAIIBUAPIDEMO1 = "/capi"
+SlashCmdList.CLAIIBUAPIDEMO = function(msg)
 	local command = strlower(strtrim(msg or ""))
 	if not kit.ready then
 		kit:Print("Not loaded yet.")
@@ -194,8 +188,3 @@ SlashCmdList.PILLARSSETTINGSKIT = function(msg)
 	local handler = slash[command] or slash.help
 	handler()
 end
-
--- Keeps the preview in step with media that loads late, e.g. after login.
-Events.On("PLAYER_LOGIN", function()
-	Demo.Apply()
-end)
