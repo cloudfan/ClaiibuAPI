@@ -16,6 +16,7 @@ Shared code for World of Warcraft: Forever addons (`## Interface: 16001`). Claii
 - **Media dropdowns** (Font, Bar Texture, Border, Background, Sound) as one scrolling column. A **Blizzard** section comes first, including Bronze and Gold Toast borders and a Bronze Dialog border. After it come one section per addon that registered media with LibSharedMedia-3.0, titled with that addon's name.
 - **Selectors** for the anchor point (TOP LEFT, TOP CENTER, TOP RIGHT, LEFT CENTER, CENTER, RIGHT CENTER, BOTTOM LEFT, BOTTOM CENTER, BOTTOM RIGHT) and the font shadow (None, Soft, Hard, Heavy).
 - **Profiles** stored as compact strings. **Default-Global** holds the defaults. The Profiles page has Save, Delete, an Export box and an Import button.
+- **A copy window** for diagnostic commands: the text opens already selected, so Ctrl+C copies it.
 - **A standard landing page**: the name and version, a description and features, and the footer "Created for use by a lazy sack of shit, Maiibu. (And Friends)".
 
 ## Install
@@ -34,7 +35,7 @@ Demo commands:
 | --- | --- |
 | `/capi` | Open the demo's settings |
 | `/capi profiles` | Open its Profiles page |
-| `/capi probe` | List which APIs and templates this client has, and which ones ClaiibuAPI is using |
+| `/capi probe` | Show which APIs and templates this client has, and which ones ClaiibuAPI is using, in a copy window |
 
 ## Use it in an addon
 
@@ -114,6 +115,8 @@ Every `key` must exist in `defaults`, with a value of the same type. A page that
 | `kit:ResetProfile()` | Put the active profile back to the defaults |
 | `kit.events` | The addon's own event frame: `On(event, fn)`, `Register(map)`, `AfterCombat(key, fn)`, `Defer(key, fn, delay)` |
 | `kit:ProbeRows()` | Lines for a probe command |
+| `kit:ShowProbe()` | The probe in the copy window |
+| `kit:ShowCopy(title, content, keepCodes)` | Show a string or a list of lines in the copy window, titled with the addon's name. The text opens selected for Ctrl+C; color codes are removed unless `keepCodes` is true |
 | `kit:Print(...)` | Print with the addon's name |
 
 ### The ClaiibuAPI global
@@ -129,6 +132,7 @@ Every `key` must exist in `defaults`, with a value of the same type. A page that
 | `Serializer.Encode`, `Serializer.Decode` | The profile string format, for other data |
 | `Compat.IsSecret`, `Compat.TemplateExists`, `Compat.AtlasExists`, `Compat.ProbeRows` | Capability checks |
 | `NewEvents()` | An event frame with a handler table, for an addon without a settings window |
+| `ShowCopyText(title, content, keepCodes)`, `HideCopyText()` | The copy window without a kit |
 
 ## Profiles
 
@@ -152,6 +156,7 @@ Every `key` must exist in `defaults`, with a value of the same type. A page that
 Nothing has been run in game yet. Run `/capi probe` on your build and check:
 
 - `Settings.RegisterCanvasLayoutCategory`/`Subcategory`. Without the Settings API, the pages open in a standalone window with the same list down the left.
+- `BasicFrameTemplateWithInset` (the copy window's frame; a plain dialog frame is used without it).
 - `SettingsCheckboxTemplate`, `SettingsDropdownWithButtonsTemplate` (and its `Dropdown`, `DecrementButton`, `IncrementButton` children), `MinimalSliderWithSteppersTemplate`, `ScrollFrameTemplate`, `InputScrollFrameTemplate`.
 - The `OnDefault`/`OnRefresh` hooks that the settings panel calls on a canvas frame.
 - StaticPopup: the edit box is read through `GetEditBox()`, `editBox` or `EditBox`, whichever the client has.

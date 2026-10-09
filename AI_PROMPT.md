@@ -110,6 +110,8 @@ Kit calls (only after `OnReady`):
 | `kit.events.On(event, fn)`, `kit.events.AfterCombat(key, fn)`, `kit.events.Defer(key, fn, delay)` | events, after-combat queue, next-frame run |
 | `kit:Print(...)` | prints with the addon's name |
 | `kit:ProbeRows()` | list of strings describing client API support |
+| `kit:ShowProbe()` | shows the probe in a copy window (text selected, ready for Ctrl+C) |
+| `kit:ShowCopy(title, linesOrString)` | shows any diagnostic text in the copy window; use it for every debug or diagnostic command instead of printing many chat lines. Never include secret values unchecked |
 
 Applying media: for a backdrop use `bgFile = background.file`, `tile = background.tile`, `tileSize = background.tileSize`, `edgeFile = border.file`, `edgeSize = <size, or 0 when border.file is nil>`, then `frame:SetBackdropBorderColor(unpack(border.color))`. For a status bar use `bar:SetStatusBarTexture(kit:GetMedia("statusbar", "<key>").file)`. For positions use an `Anchor` setting plus two `Slider` offsets and `kit:ApplyAnchor`; if the frame is protected, wrap it in `kit.events.AfterCombat`.
 
@@ -123,7 +125,7 @@ SlashCmdList.<UPPERNAME> = function(msg)
 	if not ns.kit then return end
 	local command = strlower(strtrim(msg or ""))
 	if command == "probe" then
-		for _, row in ipairs(ns.kit:ProbeRows()) do print(row) end
+		ns.kit:ShowProbe()
 	elseif command == "profiles" then
 		ns.kit:Open(ns.kit:ProfilesIndex())
 	else

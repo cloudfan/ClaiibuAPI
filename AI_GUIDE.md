@@ -8,7 +8,7 @@ This file is kept in step with the API. Every feature lists the version that add
 
 =====
 
-You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.0.0, API level 1. Repository: `cloudfan/ClaiibuAPI`.
+You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.1.0, API level 1. Repository: `cloudfan/ClaiibuAPI`.
 
 ## How to answer
 
@@ -206,7 +206,7 @@ kit.events.Defer("refresh", ns.Refresh)                                     -- o
 
 ### F17. Capability probe (since 1.0.0)
 
-`kit:ProbeRows()` returns lines describing what this client supports: the build, the settings APIs and templates, which fallback each control used, LibSharedMedia, the ClaiibuAPI version and the active profile. Print them from a `probe` slash command.
+`kit:ProbeRows()` returns lines describing what this client supports: the build, the settings APIs and templates, which fallback each control used, LibSharedMedia, the ClaiibuAPI version and the active profile. Show them with `kit:ShowProbe()` (see F19) from a `probe` slash command.
 
 ### F18. Shared helpers without a kit (since 1.0.0)
 
@@ -216,8 +216,26 @@ kit.events.Defer("refresh", ns.Refresh)                                     -- o
 - `ClaiibuAPI.GetSettings(addonName)`: another addon's kit
 - `ClaiibuAPI.Settings.ANCHORS`: the anchor list
 
+### F19. Copy window for diagnostics (since 1.1.0)
+
+A window that shows text ready to copy. When it opens the text is already selected, so the player only presses Ctrl+C. Typing in it does nothing (the text stays as shown); Esc or Close hides it; it can be dragged. Use it for diagnostic and debug commands, so players can paste the output into a bug report instead of retyping chat lines.
+
+```lua
+kit:ShowProbe()                                        -- the capability probe (F17), titled "<Addon>: Diagnostics"
+kit:ShowCopy("Roster", { "party1 = Jaina", "party2 = Thrall" })   -- any list of lines
+kit:ShowCopy("Error", someLongString)                  -- or one string
+ClaiibuAPI.ShowCopyText("Any title", lines)            -- without a kit
+ClaiibuAPI.HideCopyText()
+```
+
+- Content is a string, or a list whose items are turned into text with `tostring`, one per line.
+- Color and texture codes (`|cff...|r`, `|T...|t`) are removed so the copied text is clean. Pass `true` as the third argument to keep them.
+- One window is shared by every addon; each call replaces its title and text.
+- Gotcha: never put secret values in it (unit names or health can be secret on Forever). Check them with `ClaiibuAPI.Compat.IsSecret(value)` first, and write something like "(secret)" instead.
+- Unverified on Forever: `BasicFrameTemplateWithInset` for the frame (a plain dialog frame is used without it) and `InputScrollFrameTemplate` for the box.
+
 ### Not yet verified on Forever
 
-ClaiibuAPI has not been run in game. Each of these has a fallback, and the probe reports which one was used: the settings subcategory API, the Blizzard control templates, the Defaults-button hook, StaticPopup's edit box, the stock media paths and the sound names.
+ClaiibuAPI has not been run in game. Each of these has a fallback, and the probe reports which one was used: the settings subcategory API, the Blizzard control templates (including the copy window's frame and box), the Defaults-button hook, StaticPopup's edit box, the stock media paths and the sound names.
 
 =====

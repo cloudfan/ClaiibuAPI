@@ -518,8 +518,11 @@ local function PlainTextBox(parent, height)
 	edit:SetAutoFocus(false)
 	edit:SetPoint("TOPLEFT")
 	edit:SetPoint("RIGHT", child, "RIGHT")
-	edit:SetHeight(height)
 	child:SetHeight(height)
+	-- A multi-line edit box grows with its text; the scroll child follows.
+	edit:SetScript("OnSizeChanged", function(_, _, newHeight)
+		child:SetHeight(math.max(height, newHeight or 0))
+	end)
 	edit:SetScript("OnEscapePressed", edit.ClearFocus)
 	border:EnableMouse(true)
 	border:SetScript("OnMouseDown", function()
@@ -528,29 +531,37 @@ local function PlainTextBox(parent, height)
 	return border, edit
 end
 
-function Page:TextBox(spec)
-	self.first = false
-	local height = spec.height or 90
+-- Returns the box frame (anchor this) and its edit box. No length limit;
+-- focusing it selects everything, so Ctrl+C / Ctrl+V is a single step.
+function W.CreateTextBox(parent, height)
+	W.Detect()
 	local frame, edit
 	if native.inputScroll then
-		local ok, f, e = pcall(NativeTextBox, self.frame, height)
+		-- pcall only guards against a template that differs on this build.
+		local ok, f, e = pcall(NativeTextBox, parent, height)
 		if ok then
 			frame, edit = f, e
 			W.used.textBox = "InputScrollFrameTemplate"
 		end
 	end
 	if not frame then
-		frame, edit = PlainTextBox(self.frame, height)
+		frame, edit = PlainTextBox(parent, height)
 		W.used.textBox = "plain"
 	end
-	frame:SetPoint("TOPLEFT", W.LABEL_X, self.y - 4)
-	frame:SetPoint("RIGHT", self.frame, "RIGHT", -W.LABEL_X, 0)
 	edit:SetMaxLetters(0)
 	edit:SetAutoFocus(false)
-	-- Selecting everything on focus makes Ctrl+C / Ctrl+V a single step.
 	edit:HookScript("OnEditFocusGained", function(box)
 		box:HighlightText()
 	end)
+	return frame, edit
+end
+
+function Page:TextBox(spec)
+	self.first = false
+	local height = spec.height or 90
+	local frame, edit = W.CreateTextBox(self.frame, height)
+	frame:SetPoint("TOPLEFT", W.LABEL_X, self.y - 4)
+	frame:SetPoint("RIGHT", self.frame, "RIGHT", -W.LABEL_X, 0)
 	W.AttachTooltip(edit, spec.label or "", spec.tooltip)
 	self.y = self.y - height - 12
 	if spec.get then

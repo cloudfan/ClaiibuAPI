@@ -22,6 +22,7 @@ local kit = API.Settings.New(addonName, {
 		"Dropdowns with left and right steppers, listing Blizzard media first, then each LibSharedMedia pack under its own heading",
 		"Anchor point and font shadow selectors",
 		"Profiles saved as compact strings, shared across characters, with export and import",
+		"Diagnostics in a copy window, ready for Ctrl+C",
 	},
 	savedVariable = "ClaiibuAPIDemoDB",
 	charSavedVariable = "ClaiibuAPIDemoCharDB",
@@ -86,6 +87,34 @@ style:Button({
 	end,
 })
 style:Text("Media registered with LibSharedMedia-3.0 appears in these lists under the name of the addon that ships it.")
+
+local debug = kit:AddPage("Debug")
+debug:Header("Diagnostics")
+debug:Text("Opens a window with what this client supports and which Blizzard controls ClaiibuAPI is using. The text is selected: press Ctrl+C to copy it.")
+debug:Button({
+	label = "",
+	text = "Copy Diagnostics",
+	onClick = function(k)
+		k:ShowProbe()
+	end,
+})
+debug:Button({
+	label = "",
+	text = "Copy Current Settings",
+	tooltip = "Every setting of the active profile, one per line.",
+	onClick = function(k)
+		local lines = { "Profile: " .. k:GetActiveProfile() }
+		local keys = {}
+		for key in pairs(k.settings) do
+			keys[#keys + 1] = key
+		end
+		table.sort(keys)
+		for _, key in ipairs(keys) do
+			lines[#lines + 1] = key .. " = " .. tostring(k.settings[key])
+		end
+		k:ShowCopy("Settings", lines)
+	end,
+})
 
 -- Preview panel ----------------------------------------------------------------------
 -- Plain frames, not protected. The bar shows a fixed value, not unit data.
@@ -168,10 +197,7 @@ slash.profiles = function()
 end
 
 slash.probe = function()
-	kit:Print("Capability probe:")
-	for _, row in ipairs(kit:ProbeRows()) do
-		print("  " .. row)
-	end
+	kit:ShowProbe()
 end
 
 slash.help = function()

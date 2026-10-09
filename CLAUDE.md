@@ -4,7 +4,7 @@ A dependency addon for World of Warcraft: Forever (`## Interface: 16001`, Lua 5.
 
 ## Layout
 
-- `ClaiibuAPI/`: the API addon. Load order is `ClaiibuAPI.toc`: Events, Compat, Serializer, Media, Widgets, Profiles, Settings, API. Internal modules live on `ns.SettingsKit`; only `API.lua` defines globals.
+- `ClaiibuAPI/`: the API addon. Load order is `ClaiibuAPI.toc`: Events, Compat, Serializer, Media, Widgets, CopyWindow, Profiles, Settings, API. Internal modules live on `ns.SettingsKit`; only `API.lua` defines globals.
 - `ClaiibuAPIDemo/`: a dependent demo addon that uses every feature (`/capi`).
 - `AI_PROMPT.md`: prompt for an AI to add ClaiibuAPI to an addon.
 - `AI_GUIDE.md`: prompt for an AI to explain each feature.

@@ -60,6 +60,12 @@ API.Compat = {
 	ProbeRows = C.ProbeRows,     -- ProbeRows(kit) -> list of strings
 }
 
+-- A shared window that shows text ready to copy (Ctrl+C), for diagnostics.
+-- ShowCopyText(title, content, keepCodes): content is a string or a list of
+-- lines; color codes are removed unless keepCodes is true.
+API.ShowCopyText = SK.CopyWindow.Show
+API.HideCopyText = SK.CopyWindow.Hide
+
 -- An event frame with a handler table, AfterCombat and Defer, for an addon
 -- that wants one without a settings window. kit.events is one of these.
 API.NewEvents = SK.NewEvents

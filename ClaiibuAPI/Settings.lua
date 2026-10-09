@@ -641,6 +641,21 @@ function Kit:ProbeRows()
 	return C.ProbeRows(self)
 end
 
+-- Shows text (a string or a list of lines) in the copy window, titled with
+-- the addon's name. Use it for diagnostic commands.
+function Kit:ShowCopy(title, content, keepCodes)
+	local heading = self.title
+	if title and title ~= "" then
+		heading = heading .. ": " .. title
+	end
+	return SK.CopyWindow.Show(heading, content, keepCodes)
+end
+
+-- The capability probe in the copy window.
+function Kit:ShowProbe()
+	return self:ShowCopy("Diagnostics", self:ProbeRows())
+end
+
 -- ClaiibuAPI.Settings.New(addonName, config). config:
 --   title              shown in Options -> AddOns and on the landing page
 --   version            defaults to the .toc's ## Version

@@ -109,6 +109,7 @@ function C.ProbeRows(kit)
 		"UICheckButtonTemplate: " .. Known(C.TemplateExists("UICheckButtonTemplate")),
 		"ScrollFrameTemplate: " .. Known(C.TemplateExists("ScrollFrameTemplate")),
 		"StaticPopup_Show: " .. Has(StaticPopup_Show),
+		"BasicFrameTemplateWithInset (copy window): " .. Known(C.TemplateExists("BasicFrameTemplateWithInset")),
 		"SOUNDKIT: " .. Has(SOUNDKIT),
 		"C_AddOns.GetAddOnMetadata: " .. Has(C_AddOns and C_AddOns.GetAddOnMetadata),
 		"LibSharedMedia-3.0: " .. (SK.Media.LSM() and "loaded" or "not loaded (optional)"),
