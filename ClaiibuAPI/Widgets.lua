@@ -104,8 +104,25 @@ local Page = {}
 Page.__index = Page
 W.Page = Page
 
+-- Layout: every item is a block that spans the page's width and hangs from
+-- the block above it. Text blocks measure their height again whenever the
+-- page's width changes, so wrapped text pushes everything below it down
+-- instead of running into it. (The page has no width while it is built;
+-- it gets one when the settings panel first shows it.)
+
 function W.NewPage(parent)
-	return setmetatable({ frame = parent, y = W.TOP, controls = {}, first = true }, Page)
+	local page = setmetatable({ frame = parent, controls = {}, blocks = {}, first = true }, Page)
+	-- Measure now, and again next frame, in case the client updates text
+	-- sizes after the width change.
+	local function Relayout()
+		page:Layout()
+		SK.Events.Defer(page, function()
+			page:Layout()
+		end)
+	end
+	parent:HookScript("OnSizeChanged", Relayout)
+	parent:HookScript("OnShow", Relayout)
+	return page
 end
 
 function Page:Refresh()
@@ -114,55 +131,95 @@ function Page:Refresh()
 	end
 end
 
+-- Adds a block of the given height, gap pixels below the previous one.
+-- measure (optional) returns the block's height for the current width.
+function Page:Block(height, gap, measure)
+	local block = CreateFrame("Frame", nil, self.frame)
+	local last = self.blocks[#self.blocks]
+	if last then
+		block:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, -gap)
+		block:SetPoint("TOPRIGHT", last, "BOTTOMRIGHT", 0, -gap)
+	else
+		block:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, W.TOP - gap)
+		block:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", 0, W.TOP - gap)
+	end
+	block:SetHeight(height)
+	block:SetFrameLevel(self.frame:GetFrameLevel()) -- under the controls
+	block.gap = gap
+	block.measure = measure
+	self.blocks[#self.blocks + 1] = block
+	self.first = false
+	return block
+end
+
+-- Re-measures text blocks and returns the page's total height.
+function Page:Layout()
+	local total = -W.TOP + 16
+	for _, block in ipairs(self.blocks) do
+		if block.measure then
+			block:SetHeight(block.measure())
+		end
+		total = total + block.gap + block:GetHeight()
+	end
+	if self.fitFrame then
+		self.fitFrame:SetHeight(total)
+	end
+	return total
+end
+
+-- Keeps frame (a scroll child) as tall as the page's content.
+function Page:Fit(frame)
+	self.fitFrame = frame
+	self:Layout()
+end
+
 function Page:Height()
-	return -self.y + 16
+	return self:Layout()
 end
 
 function Page:Header(text)
-	if not self.first then
-		self.y = self.y - W.SECTION_GAP
-	end
-	self.first = false
-	local header = self.frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge")
-	header:SetPoint("TOPLEFT", 7, self.y)
+	local block = self:Block(30, self.first and 0 or W.SECTION_GAP)
+	local header = block:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge")
+	header:SetPoint("TOPLEFT", 7, 0)
+	header:SetPoint("RIGHT", block, "RIGHT", -7, 0)
+	header:SetJustifyH("LEFT")
+	header:SetWordWrap(false)
 	header:SetText(text)
-	self.y = self.y - 30
 end
 
 function Page:Text(text)
-	self.first = false
-	local note = self.frame:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-	note:SetPoint("TOPLEFT", W.LABEL_X, self.y)
-	note:SetPoint("RIGHT", self.frame, "RIGHT", -W.LABEL_X, 0)
+	local note
+	local block = self:Block(20, 0, function()
+		return math.ceil(note:GetStringHeight()) + 10
+	end)
+	note = block:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	note:SetPoint("TOPLEFT", W.LABEL_X, 0)
+	note:SetPoint("TOPRIGHT", -W.LABEL_X, 0)
 	note:SetJustifyH("LEFT")
+	note:SetJustifyV("TOP")
 	note:SetSpacing(2)
 	note:SetText(text)
-	self.y = self.y - note:GetStringHeight() - 10
+	block:SetHeight(block.measure())
 end
 
--- A labelled row. Returns the y of its center line and a frame over the
--- whole row for the tooltip.
+-- A labelled row. Returns the row frame (place the control on it with
+-- Page:Place); the row also carries the tooltip.
 function Page:Row(label, tooltip)
-	self.first = false
-	local center = self.y - W.ROW_HEIGHT / 2
-	local hover = CreateFrame("Frame", nil, self.frame)
-	hover:SetPoint("TOPLEFT", 0, self.y)
-	hover:SetPoint("RIGHT", self.frame, "RIGHT", 0, 0)
-	hover:SetHeight(W.ROW_HEIGHT)
-	hover:SetFrameLevel(self.frame:GetFrameLevel()) -- under the row's control
-	hover:EnableMouse(tooltip ~= nil)
-	W.AttachTooltip(hover, label, tooltip)
-	local text = self.frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	text:SetPoint("LEFT", self.frame, "TOPLEFT", W.LABEL_X, center)
-	text:SetWidth(220)
+	local row = self:Block(W.ROW_HEIGHT, 0)
+	row:EnableMouse(tooltip ~= nil)
+	W.AttachTooltip(row, label, tooltip)
+	local text = row:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	text:SetPoint("LEFT", row, "LEFT", W.LABEL_X, 0)
+	-- The label stops short of the control column instead of running under it.
+	text:SetPoint("RIGHT", row, "CENTER", W.CONTROL_X - 8, 0)
 	text:SetJustifyH("LEFT")
+	text:SetWordWrap(false)
 	text:SetText(label or "")
-	self.y = self.y - W.ROW_HEIGHT
-	return center, hover
+	return row, row
 end
 
-function Page:Place(control, center, xOffset)
-	control:SetPoint("LEFT", self.frame, "TOP", W.CONTROL_X + (xOffset or 0), center)
+function Page:Place(control, row, xOffset)
+	control:SetPoint("LEFT", row, "CENTER", W.CONTROL_X + (xOffset or 0), 0)
 end
 
 -- Checkbox -------------------------------------------------------------------------
@@ -557,13 +614,12 @@ function W.CreateTextBox(parent, height)
 end
 
 function Page:TextBox(spec)
-	self.first = false
 	local height = spec.height or 90
+	local block = self:Block(height + 12, 0)
 	local frame, edit = W.CreateTextBox(self.frame, height)
-	frame:SetPoint("TOPLEFT", W.LABEL_X, self.y - 4)
-	frame:SetPoint("RIGHT", self.frame, "RIGHT", -W.LABEL_X, 0)
+	frame:SetPoint("TOPLEFT", block, "TOPLEFT", W.LABEL_X, -4)
+	frame:SetPoint("RIGHT", block, "RIGHT", -W.LABEL_X, 0)
 	W.AttachTooltip(edit, spec.label or "", spec.tooltip)
-	self.y = self.y - height - 12
 	if spec.get then
 		self.controls[#self.controls + 1] = function()
 			if not edit:HasFocus() then
