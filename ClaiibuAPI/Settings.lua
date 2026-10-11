@@ -376,7 +376,7 @@ local function BuildLanding(kit, canvas)
 	if #kit.pageSpecs > 0 then
 		page:Text("The settings are in the sections listed under " .. kit.title .. " on the left.")
 	end
-	page:Fit(child)
+	child:SetHeight(page:Height())
 	return page
 end
 
@@ -477,7 +477,7 @@ local function BuildSettingsPage(kit, name, fill)
 	scroll:SetPoint("BOTTOMRIGHT", -24, 4)
 	local page = W.NewPage(child)
 	fill(page)
-	page:Fit(child)
+	child:SetHeight(page:Height())
 	kit.pages[#kit.pages + 1] = page
 	return canvas
 end

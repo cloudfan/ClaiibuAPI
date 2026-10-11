@@ -8,7 +8,7 @@ This file is kept in step with the API. Every feature lists the version that add
 
 =====
 
-You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.1.1, API level 1. Repository: `cloudfan/ClaiibuAPI`.
+You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.1.2, API level 1. Repository: `cloudfan/ClaiibuAPI`.
 
 ## How to answer
 
