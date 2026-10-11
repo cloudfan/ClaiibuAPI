@@ -199,7 +199,7 @@ end
 local function PopupNames(kit)
 	local prefix = "CLAIIBUAPI_" .. kit.addonName:upper()
 	return { save = prefix .. "_SAVE_PROFILE", overwrite = prefix .. "_OVERWRITE_PROFILE",
-		delete = prefix .. "_DELETE_PROFILE" }
+		delete = prefix .. "_DELETE_PROFILE", reload = prefix .. "_RELOAD" }
 end
 
 local function EditBoxOf(dialog)
@@ -214,7 +214,8 @@ end
 
 local fallbackDialog
 
--- spec: text, button1, button2, editText (nil = no edit box), onAccept(text)
+-- spec: text, button1, button2, editText (nil = no edit box), onAccept(text),
+-- onCancel() (optional)
 local function ShowFallback(spec)
 	local dialog = fallbackDialog
 	if not dialog then
@@ -239,15 +240,18 @@ local function ShowFallback(spec)
 		dialog.cancel = CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
 		dialog.cancel:SetSize(110, 22)
 		dialog.cancel:SetPoint("BOTTOMLEFT", dialog, "BOTTOM", 4, 16)
-		dialog.cancel:SetScript("OnClick", function()
-			dialog:Hide()
-		end)
-		dialog.edit:SetScript("OnEscapePressed", function()
-			dialog:Hide()
-		end)
 		fallbackDialog = dialog
 	end
+	local function Cancel()
+		dialog:Hide()
+		if spec.onCancel then
+			spec.onCancel()
+		end
+	end
+	dialog.cancel:SetScript("OnClick", Cancel)
+	dialog.edit:SetScript("OnEscapePressed", Cancel)
 	dialog.text:SetText(spec.text)
+	dialog:SetHeight(math.max(130, (dialog.text:GetStringHeight() or 0) + (spec.editText and 100 or 70)))
 	dialog.accept:SetText(spec.button1)
 	dialog.cancel:SetText(spec.button2)
 	local function Accept()
@@ -309,6 +313,26 @@ local function RegisterPopups(kit)
 		button2 = NO or "No",
 		OnAccept = function(_, data)
 			Profiles.SaveAs(kit, data.name, data.text)
+		end,
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		showAlert = true,
+		preferredIndex = 3,
+	}
+	StaticPopupDialogs[kit.popups.reload] = {
+		text = "%s",
+		button1 = RELOADUI or "Reload UI",
+		button2 = IGNORE or "Ignore",
+		OnAccept = function()
+			Profiles.Flush(kit)
+			ReloadUI()
+		end,
+		OnCancel = function(_, data, reason)
+			-- Ignore was clicked (not a timeout or another popup replacing it).
+			if reason ~= "override" and data then
+				kit:MuteReload(data.changed)
+			end
 		end,
 		timeout = 0,
 		whileDead = true,
@@ -399,6 +423,40 @@ function Profiles.PromptDelete(kit)
 		button2 = NO or "No",
 		onAccept = function()
 			Profiles.Delete(kit, name)
+		end,
+	})
+end
+
+-- Reload prompt: changed is a list of { key, label }. Reload UI reloads now;
+-- Ignore mutes those settings until the next reload.
+local function ReloadText(kit, changed)
+	local names = {}
+	for i, item in ipairs(changed) do
+		names[i] = item.label
+	end
+	return kit.title .. "\n\n" .. table.concat(names, ", ") .. "\n\n"
+		.. "This change can cause errors or blocked actions (taint) until the UI is reloaded. Reload now?"
+end
+
+function Profiles.PromptReload(kit, changed)
+	local text = ReloadText(kit, changed)
+	if UsePopups() then
+		if StaticPopup_Visible and StaticPopup_Visible(kit.popups.reload) then
+			StaticPopup_Hide(kit.popups.reload)
+		end
+		StaticPopup_Show(kit.popups.reload, text, nil, { changed = changed })
+		return
+	end
+	ShowFallback({
+		text = text,
+		button1 = RELOADUI or "Reload UI",
+		button2 = IGNORE or "Ignore",
+		onAccept = function()
+			Profiles.Flush(kit)
+			ReloadUI()
+		end,
+		onCancel = function()
+			kit:MuteReload(changed)
 		end,
 	})
 end

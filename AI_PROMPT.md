@@ -88,6 +88,8 @@ Every other file of the addon must check `if not ns.kit then return end` at the 
 | `page:FontShadow{}` | `key`, `label` (optional), `tooltip` | `"none"`, `"soft"`, `"hard"` or `"heavy"` |
 | `page:Button{}` | `label` (row label, may be `""`), `text`, `tooltip`, `width`, `onClick(kit)`, `enabled(kit)` | — |
 
+Any control with a `key` (Checkbox, Slider, Dropdown, MediaDropdown, Anchor, FontShadow) also takes `reload = true`. Set it on every setting whose change can taint the UI until a reload: hiding, moving, reparenting or hooking Blizzard frames; changing secure or protected frames, attributes or state drivers; enabling or disabling a whole module that does any of those. Changing such a setting shows a "Reload UI / Ignore" dialog. Do not set it on purely visual settings of the addon's own plain frames.
+
 Rules: every `key` must exist in `defaults` with a value of the same type. Default values for media keys:
 
 - font: `"default"`, `"friz"`, `"arialn"`, `"morpheus"` or `"skurri"`
@@ -111,6 +113,7 @@ Kit calls (only after `OnReady`):
 | `kit:Print(...)` | prints with the addon's name |
 | `kit:ProbeRows()` | list of strings describing client API support |
 | `kit:ShowProbe()` | shows the probe in a copy window (text selected, ready for Ctrl+C) |
+| `kit:RequestReload(reason)` | shows the Reload UI / Ignore dialog from code, for taint-prone changes made outside the settings pages |
 | `kit:ShowCopy(title, linesOrString)` | shows any diagnostic text in the copy window; use it for every debug or diagnostic command instead of printing many chat lines. Never include secret values unchecked |
 
 Applying media: for a backdrop use `bgFile = background.file`, `tile = background.tile`, `tileSize = background.tileSize`, `edgeFile = border.file`, `edgeSize = <size, or 0 when border.file is nil>`, then `frame:SetBackdropBorderColor(unpack(border.color))`. For a status bar use `bar:SetStatusBarTexture(kit:GetMedia("statusbar", "<key>").file)`. For positions use an `Anchor` setting plus two `Slider` offsets and `kit:ApplyAnchor`; if the frame is protected, wrap it in `kit.events.AfterCombat`.

@@ -23,6 +23,7 @@ local kit = API.Settings.New(addonName, {
 		"Anchor point and font shadow selectors",
 		"Profiles saved as compact strings, shared across characters, with export and import",
 		"Diagnostics in a copy window, ready for Ctrl+C",
+		"A Reload UI / Ignore prompt for settings that can cause taint",
 	},
 	savedVariable = "ClaiibuAPIDemoDB",
 	charSavedVariable = "ClaiibuAPIDemoCharDB",
@@ -41,6 +42,7 @@ local kit = API.Settings.New(addonName, {
 		borderSize = 12,
 		background = "solid",
 		alertSound = "readycheck",
+		exampleReload = false,
 	},
 	onChange = function()
 		Demo.Apply()
@@ -89,6 +91,23 @@ style:Button({
 style:Text("Media registered with LibSharedMedia-3.0 appears in these lists under the name of the addon that ships it.")
 
 local debug = kit:AddPage("Debug")
+debug:Header("Reload Prompt")
+debug:Text("A setting marked reload = true asks to reload the UI when it changes, because changes like it can leave "
+	.. "Blizzard's frames tainted until a reload. This checkbox does nothing else.")
+debug:Checkbox({
+	key = "exampleReload",
+	label = "Example: Needs a Reload",
+	tooltip = "Toggle it to see the prompt. Ignore stops it asking about this setting until the next reload.",
+	reload = true,
+})
+debug:Button({
+	label = "",
+	text = "Ask for a Reload",
+	tooltip = "kit:RequestReload(reason), for changes made outside the settings pages.",
+	onClick = function(k)
+		k:RequestReload("The demo's Ask for a Reload button")
+	end,
+})
 debug:Header("Diagnostics")
 debug:Text("Opens a window with what this client supports and which Blizzard controls ClaiibuAPI is using. The text is selected: press Ctrl+C to copy it.")
 debug:Button({

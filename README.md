@@ -17,6 +17,7 @@ Shared code for World of Warcraft: Forever addons (`## Interface: 16001`). Claii
 - **Media dropdowns** (Font, Bar Texture, Border, Background, Sound) as one scrolling column. A **Blizzard** section comes first, including Bronze and Gold Toast borders and a Bronze Dialog border. After it come one section per addon that registered media with LibSharedMedia-3.0, titled with that addon's name.
 - **Selectors** for the anchor point (TOP LEFT, TOP CENTER, TOP RIGHT, LEFT CENTER, CENTER, RIGHT CENTER, BOTTOM LEFT, BOTTOM CENTER, BOTTOM RIGHT) and the font shadow (None, Soft, Hard, Heavy).
 - **Profiles** stored as compact strings. **Default-Global** holds the defaults. The Profiles page has Save, Delete, an Export box and an Import button.
+- **A reload prompt** (Reload UI / Ignore) for settings marked `reload = true`, whose changes can taint the UI until a reload.
 - **A copy window** for diagnostic commands: the text opens already selected, so Ctrl+C copies it.
 - **A standard landing page**: the name and version, a description and features, and the footer "Created for use by a lazy sack of shit, Maiibu. (And Friends)".
 
@@ -102,6 +103,8 @@ Every `key` must exist in `defaults`, with a value of the same type. A page that
 | `page:FontShadow{}` | `key`, `label`, `tooltip` | `none`, `soft`, `hard`, `heavy` |
 | `page:Button{}` | `label`, `text`, `tooltip`, `width`, `onClick(kit)`, `enabled(kit)` | — |
 
+Add `reload = true` to any control with a `key` whose change can taint the UI until a reload (hiding, moving or hooking Blizzard frames, secure frames, toggling whole modules). Changing it then shows a **Reload UI / Ignore** dialog that names the changed settings. It compares against the value the UI loaded with, asks once per slider drag, also asks after profile switches, imports and Defaults, and **Ignore** stops asking about those settings until the next reload.
+
 ### Kit calls
 
 | Call | What it does |
@@ -117,6 +120,7 @@ Every `key` must exist in `defaults`, with a value of the same type. A page that
 | `kit.events` | The addon's own event frame: `On(event, fn)`, `Register(map)`, `AfterCombat(key, fn)`, `Defer(key, fn, delay)` |
 | `kit:ProbeRows()` | Lines for a probe command |
 | `kit:ShowProbe()` | The probe in the copy window |
+| `kit:RequestReload(reason)` | Show the Reload UI / Ignore dialog from code, naming `reason` |
 | `kit:ShowCopy(title, content, keepCodes)` | Show a string or a list of lines in the copy window, titled with the addon's name. The text opens selected for Ctrl+C; color codes are removed unless `keepCodes` is true |
 | `kit:Print(...)` | Print with the addon's name |
 

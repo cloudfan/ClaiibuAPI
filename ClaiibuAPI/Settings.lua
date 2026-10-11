@@ -117,10 +117,66 @@ function Kit:Get(key)
 	return self.settings[key]
 end
 
+-- Reload prompts -------------------------------------------------------------------
+-- Settings marked reload = true can leave the UI tainted (blocked actions)
+-- until a reload. When one of them differs from the value the UI loaded
+-- with, the player is asked: Reload UI, or Ignore (that setting is not
+-- asked about again this session).
+
+local RELOAD_NOTE = "Changing this asks you to reload the UI."
+
+local function ReloadPending(kit)
+	local changed = {}
+	for key, label in pairs(kit.reloadKeys) do
+		if not kit.reloadMuted[key] and not Serializer.DeepEqual(kit.settings[key], kit.reloadBaseline[key]) then
+			changed[#changed + 1] = { key = key, label = label }
+		end
+	end
+	table.sort(changed, function(a, b)
+		return a.label < b.label
+	end)
+	return changed
+end
+
+-- Waits a moment so a dragged slider or a stepped dropdown asks once.
+local function CheckReload(kit)
+	if not kit.ready or not next(kit.reloadKeys) then
+		return
+	end
+	kit.events.Defer("reloadPrompt", function()
+		local changed = ReloadPending(kit)
+		if #changed > 0 then
+			Profiles.PromptReload(kit, changed)
+		end
+	end, 0.4)
+end
+
 local function Changed(kit, key, value)
 	Profiles.Flush(kit)
 	if kit.config.onChange then
 		kit.config.onChange(key, value, kit)
+	end
+	if kit.reloadKeys[key] then
+		CheckReload(kit)
+	end
+end
+
+-- Asks for a reload from addon code, e.g. after a change made outside the
+-- settings pages. reason is shown in the dialog.
+function Kit:RequestReload(reason)
+	if not self.ready then
+		return
+	end
+	Profiles.PromptReload(self, { { key = false, label = reason or "A change in " .. self.title } })
+end
+
+-- Called by the Ignore button: these settings are not asked about again
+-- until the next reload.
+function Kit:MuteReload(changed)
+	for _, item in ipairs(changed) do
+		if item.key then
+			self.reloadMuted[item.key] = true
+		end
 	end
 end
 
@@ -186,6 +242,7 @@ function Kit:ProfileChanged()
 	if self.config.onProfileChanged then
 		self.config.onProfileChanged(self)
 	end
+	CheckReload(self)
 	-- After the menu or dialog that asked for it has closed.
 	self.events.Defer("profileRefresh", function()
 		self:Refresh()
@@ -220,12 +277,17 @@ end
 
 -- Binding a page step to the settings ------------------------------------------------
 
-local function Bind(kit, spec)
+-- defaultLabel is the label a control uses when spec.label is unset.
+local function Bind(kit, spec, defaultLabel)
 	local bound = {}
 	for field, value in pairs(spec) do
 		bound[field] = value
 	end
 	local key = spec.key
+	if spec.reload and key ~= nil then
+		kit.reloadKeys[key] = spec.label or defaultLabel or key
+		bound.tooltip = spec.tooltip and (spec.tooltip .. "\n\n" .. RELOAD_NOTE) or RELOAD_NOTE
+	end
 	bound.get = bound.get or function()
 		return kit.settings[key]
 	end
@@ -275,7 +337,7 @@ function BUILD.MediaDropdown(kit, page, spec)
 	if not Media.LABELS[kind] then
 		error(kit.addonName .. ": unknown mediaType " .. tostring(kind), 0)
 	end
-	local bound = Bind(kit, spec)
+	local bound = Bind(kit, spec, Media.LABELS[kind])
 	bound.label = spec.label or Media.LABELS[kind]
 	bound.options = function()
 		return Media.Options(kind)
@@ -294,7 +356,7 @@ function BUILD.MediaDropdown(kit, page, spec)
 end
 
 function BUILD.FontShadow(kit, page, spec)
-	local bound = Bind(kit, spec)
+	local bound = Bind(kit, spec, "Font Shadow")
 	bound.label = spec.label or "Font Shadow"
 	bound.options = function()
 		return Media.SHADOWS
@@ -303,7 +365,7 @@ function BUILD.FontShadow(kit, page, spec)
 end
 
 function BUILD.Anchor(kit, page, spec)
-	local bound = Bind(kit, spec)
+	local bound = Bind(kit, spec, "Anchor Point")
 	bound.label = spec.label or "Anchor Point"
 	bound.options = function()
 		return SK.ANCHORS
@@ -575,6 +637,10 @@ local function Init(kit)
 	Profiles.InitDialogs(kit)
 
 	local canvases = BuildCanvases(kit)
+	-- The values the UI is running with, for the reload prompt.
+	for key in pairs(kit.reloadKeys) do
+		kit.reloadBaseline[key] = Serializer.DeepCopy(kit.settings[key])
+	end
 	if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterCanvasLayoutSubcategory
 		and Settings.RegisterAddOnCategory then
 		RegisterWithSettings(kit, canvases)
@@ -686,6 +752,9 @@ function SK.New(owner, config)
 		defaults = Serializer.DeepCopy(config.defaults),
 		pageSpecs = {},
 		pages = {},
+		reloadKeys = {},     -- key -> label, for settings marked reload = true
+		reloadBaseline = {}, -- their values when the UI loaded
+		reloadMuted = {},    -- keys the player chose to ignore this session
 		readyQueue = {},
 		-- The owning addon's own event frame. The addon may use it too.
 		events = SK.NewEvents(),

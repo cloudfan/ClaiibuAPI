@@ -8,7 +8,7 @@ This file is kept in step with the API. Every feature lists the version that add
 
 =====
 
-You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.1.2, API level 1. Repository: `cloudfan/ClaiibuAPI`.
+You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.2.0, API level 1. Repository: `cloudfan/ClaiibuAPI`.
 
 ## How to answer
 
@@ -233,6 +233,26 @@ ClaiibuAPI.HideCopyText()
 - One window is shared by every addon; each call replaces its title and text.
 - Gotcha: never put secret values in it (unit names or health can be secret on Forever). Check them with `ClaiibuAPI.Compat.IsSecret(value)` first, and write something like "(secret)" instead.
 - Unverified on Forever: `BasicFrameTemplateWithInset` for the frame (a plain dialog frame is used without it) and `InputScrollFrameTemplate` for the box.
+
+### F20. Reload prompt for settings that can cause taint (since 1.2.0)
+
+Some changes can leave the UI tainted until a reload: Blizzard's code then hits "Interface action failed because of an AddOn" or blocked actions. Typical cases are settings that hide, move, reparent or hook Blizzard frames, change secure or protected frames, or switch a whole module on or off. Mark those settings with `reload = true`. When one of them changes, ClaiibuAPI shows a dialog naming the changed settings, with **Reload UI** and **Ignore**.
+
+```lua
+page:Checkbox({ key = "hideBlizzardParty", label = "Hide Blizzard Party Frames", reload = true })
+page:Dropdown({ key = "barMode", label = "Bar Mode", options = modes, reload = true })
+kit:RequestReload("Click casting was turned on")   -- from addon code
+```
+
+- `reload = true` works on Checkbox, Slider, Dropdown, MediaDropdown, Anchor and FontShadow. The tooltip gets "Changing this asks you to reload the UI." added.
+- The prompt compares against the value the UI loaded with: changing a setting and changing it back asks nothing.
+- It waits a moment after the last change, so dragging a slider asks once.
+- Profile switches, imports, deletes and Defaults ask too, if they change a marked setting.
+- **Reload UI** saves the profile and calls `ReloadUI()`. **Ignore** (or Esc) stops asking about those settings until the next reload; the change itself still applies.
+- `kit:RequestReload(reason)` shows the same dialog with `reason` as the changed item, for changes made outside the settings pages.
+- Gotcha: the setting still has to apply what it can at once (or on next login) in `onChange`; the prompt does not undo or delay it. If the change is not safe in combat, wrap it in `kit.events.AfterCombat`.
+- Gotcha: don't mark purely visual settings (colors, fonts, sizes of the addon's own plain frames); the prompt would only annoy players.
+- Unverified on Forever: the `RELOADUI`/`IGNORE` button labels (English text is used if missing) and StaticPopup's `OnCancel` reason values.
 
 ### Not yet verified on Forever
 

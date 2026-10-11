@@ -2,6 +2,21 @@
 
 Each entry is a prompt for an AI assistant. Paste the prompt, then the addon's `.toc` and `.lua` files under it. Newest first.
 
+## 1.2.0: reload prompt for settings that can cause taint
+
+```
+Update this World of Warcraft: Forever addon (Lua 5.1, ## Interface: 16001) to use ClaiibuAPI 1.2.0's reload prompt.
+
+1. Find every setting whose change can taint the UI until a reload: settings that hide, show, move, reparent, rescale or hook Blizzard frames (hooksecurefunc, SetScript or SetAlpha on Blizzard frames); that create, change or attach secure/protected frames, secure attributes, state drivers or unit watches; or that enable or disable a whole module doing any of those.
+2. On each such setting's page control (page:Checkbox, Slider, Dropdown, MediaDropdown, Anchor or FontShadow), add reload = true. Leave purely visual settings of the addon's own plain frames alone.
+3. Where code changes something taint-prone outside the settings pages (a slash command, a button), call ns.kit:RequestReload("<short description>") after making the change, guarded with: if ns.kit.RequestReload then ... end
+4. Keep each setting's onChange behaviour as it is; the prompt only asks for a reload, it does not undo or delay the change. Keep InCombatLockdown checks and kit.events.AfterCombat where they already are.
+5. Keep ClaiibuAPI.Require(1, addonName). Older ClaiibuAPI versions ignore reload = true, so no other check is needed. Add "Requires ClaiibuAPI 1.2.0 or newer for the reload prompt" to the README or notes.
+6. Do not change anything else. No new globals, no new event frames, no popups of the addon's own.
+
+Output every changed file in full (no fragments, no "rest unchanged"), then a list of the settings you marked and why each can cause taint.
+```
+
 ## 1.1.0: diagnostic output goes to the copy window
 
 ```
