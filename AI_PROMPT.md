@@ -72,7 +72,7 @@ Every other file of the addon must check `if not ns.kit then return end` at the 
 
 ## API (complete)
 
-`API.Settings.New(addonName, config)`: call once, at file scope. Config fields: `title` (default: the `.toc` Title), `version` (default: the `.toc` Version), `description`, `features` (list of strings), `savedVariable` (required), `charSavedVariable` (required), `defaults` (required), `onChange(key, value, kit)`, `onProfileChanged(kit)`, `onMediaRegistered(kit)`. Do not set `footer`.
+`API.Settings.New(addonName, config)`: call once, at file scope. Config fields: `title` (default: the `.toc` Title), `version` (default: the `.toc` Version), `description`, `features` (list of strings), `savedVariable` (required), `charSavedVariable` (required), `defaults` (required), `onChange(key, value, kit)`, `onProfileChanged(kit)`, `onMediaRegistered(kit)`, `reloadCooldown` (seconds the reload prompt stays away after Ignore; default 300, leave unset unless asked). Do not set `footer`.
 
 `kit:AddPage(name)` returns a page. Each page appears under the addon in Options → AddOns. Page methods (all take one table unless noted):
 
@@ -88,7 +88,7 @@ Every other file of the addon must check `if not ns.kit then return end` at the 
 | `page:FontShadow{}` | `key`, `label` (optional), `tooltip` | `"none"`, `"soft"`, `"hard"` or `"heavy"` |
 | `page:Button{}` | `label` (row label, may be `""`), `text`, `tooltip`, `width`, `onClick(kit)`, `enabled(kit)` | — |
 
-Any control with a `key` (Checkbox, Slider, Dropdown, MediaDropdown, Anchor, FontShadow) also takes `reload = true`. Set it on every setting whose change can taint the UI until a reload: hiding, moving, reparenting or hooking Blizzard frames; changing secure or protected frames, attributes or state drivers; enabling or disabling a whole module that does any of those. Changing such a setting shows a "Reload UI / Ignore" dialog. Do not set it on purely visual settings of the addon's own plain frames.
+Any control with a `key` (Checkbox, Slider, Dropdown, MediaDropdown, Anchor, FontShadow) also takes `reload = true`. Set it on every setting whose change can taint the UI until a reload: hiding, moving, reparenting or hooking Blizzard frames; changing secure or protected frames, attributes or state drivers; enabling or disabling a whole module that does any of those. Changing such a setting shows a "Reload UI / Ignore" dialog; Ignore keeps it away for `reloadCooldown` seconds, and an open dialog is never reopened. Do not set it on purely visual settings of the addon's own plain frames.
 
 Rules: every `key` must exist in `defaults` with a value of the same type. Default values for media keys:
 

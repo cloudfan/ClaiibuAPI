@@ -8,7 +8,7 @@ This file is kept in step with the API. Every feature lists the version that add
 
 =====
 
-You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.2.0, API level 1. Repository: `cloudfan/ClaiibuAPI`.
+You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.3.0, API level 1. Repository: `cloudfan/ClaiibuAPI`.
 
 ## How to answer
 
@@ -65,6 +65,7 @@ kit:OnReady(function() ns.Apply() end)
 
 - Config: `title` and `version` default to the `.toc`; `description` and `features` fill the landing page; `defaults` lists every setting.
 - `onChange` runs after any setting changes, `onProfileChanged` after a profile switch, delete, import or reset, `onMediaRegistered` when a LibSharedMedia pack registers media late.
+- `reloadCooldown` (seconds, default 300) is how long the reload prompt stays away after the player clicks Ignore (see F20).
 - Gotcha: settings exist only after `ADDON_LOADED`. Read them in `kit:OnReady`, never at file scope.
 - Gotcha: calling `New` twice for one addon raises an error.
 
@@ -234,7 +235,7 @@ ClaiibuAPI.HideCopyText()
 - Gotcha: never put secret values in it (unit names or health can be secret on Forever). Check them with `ClaiibuAPI.Compat.IsSecret(value)` first, and write something like "(secret)" instead.
 - Unverified on Forever: `BasicFrameTemplateWithInset` for the frame (a plain dialog frame is used without it) and `InputScrollFrameTemplate` for the box.
 
-### F20. Reload prompt for settings that can cause taint (since 1.2.0)
+### F20. Reload prompt for settings that can cause taint (since 1.2.0; Ignore cooldown since 1.3.0)
 
 Some changes can leave the UI tainted until a reload: Blizzard's code then hits "Interface action failed because of an AddOn" or blocked actions. Typical cases are settings that hide, move, reparent or hook Blizzard frames, change secure or protected frames, or switch a whole module on or off. Mark those settings with `reload = true`. When one of them changes, ClaiibuAPI shows a dialog naming the changed settings, with **Reload UI** and **Ignore**.
 
@@ -248,8 +249,10 @@ kit:RequestReload("Click casting was turned on")   -- from addon code
 - The prompt compares against the value the UI loaded with: changing a setting and changing it back asks nothing.
 - It waits a moment after the last change, so dragging a slider asks once.
 - Profile switches, imports, deletes and Defaults ask too, if they change a marked setting.
-- **Reload UI** saves the profile and calls `ReloadUI()`. **Ignore** (or Esc) stops asking about those settings until the next reload; the change itself still applies.
-- `kit:RequestReload(reason)` shows the same dialog with `reason` as the changed item, for changes made outside the settings pages.
+- **Reload UI** saves the profile and calls `ReloadUI()`. **Ignore** (or Esc) starts a cooldown: for 5 minutes the prompt does not appear at all, whatever changes. A change after the cooldown asks again. The change itself always applies.
+- Set the cooldown per addon with the config field `reloadCooldown` (seconds, default 300): `API.Settings.New(addonName, { ..., reloadCooldown = 120 })`.
+- While the prompt is open, further changes leave it as it is; it is never closed and reopened. ClaiibuAPI also never replaces one of its other open dialogs (profile save, overwrite, delete) with the prompt.
+- `kit:RequestReload(reason)` shows the same dialog with `reason` as the changed item, for changes made outside the settings pages. It follows the same cooldown and does nothing while the prompt is open.
 - Gotcha: the setting still has to apply what it can at once (or on next login) in `onChange`; the prompt does not undo or delay it. If the change is not safe in combat, wrap it in `kit.events.AfterCombat`.
 - Gotcha: don't mark purely visual settings (colors, fonts, sizes of the addon's own plain frames); the prompt would only annoy players.
 - Unverified on Forever: the `RELOADUI`/`IGNORE` button labels (English text is used if missing) and StaticPopup's `OnCancel` reason values.

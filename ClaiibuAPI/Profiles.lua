@@ -328,10 +328,10 @@ local function RegisterPopups(kit)
 			Profiles.Flush(kit)
 			ReloadUI()
 		end,
-		OnCancel = function(_, data, reason)
-			-- Ignore was clicked (not a timeout or another popup replacing it).
-			if reason ~= "override" and data then
-				kit:MuteReload(data.changed)
+		OnCancel = function(_, _, reason)
+			-- Ignore was clicked or Esc pressed (not another popup replacing it).
+			if reason ~= "override" then
+				kit:IgnoreReload()
 			end
 		end,
 		timeout = 0,
@@ -428,7 +428,7 @@ function Profiles.PromptDelete(kit)
 end
 
 -- Reload prompt: changed is a list of { key, label }. Reload UI reloads now;
--- Ignore mutes those settings until the next reload.
+-- Ignore starts the kit's cooldown. An open prompt is never reopened.
 local function ReloadText(kit, changed)
 	local names = {}
 	for i, item in ipairs(changed) do
@@ -442,9 +442,13 @@ function Profiles.PromptReload(kit, changed)
 	local text = ReloadText(kit, changed)
 	if UsePopups() then
 		if StaticPopup_Visible and StaticPopup_Visible(kit.popups.reload) then
-			StaticPopup_Hide(kit.popups.reload)
+			return
 		end
 		StaticPopup_Show(kit.popups.reload, text, nil, { changed = changed })
+		return
+	end
+	-- The fallback dialog is shared; never replace one that is open.
+	if fallbackDialog and fallbackDialog:IsShown() then
 		return
 	end
 	ShowFallback({
@@ -456,7 +460,7 @@ function Profiles.PromptReload(kit, changed)
 			ReloadUI()
 		end,
 		onCancel = function()
-			kit:MuteReload(changed)
+			kit:IgnoreReload()
 		end,
 	})
 end

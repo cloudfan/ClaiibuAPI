@@ -27,6 +27,9 @@ local kit = API.Settings.New(addonName, {
 	},
 	savedVariable = "ClaiibuAPIDemoDB",
 	charSavedVariable = "ClaiibuAPIDemoCharDB",
+	-- Seconds the reload prompt stays away after Ignore (default 300). Short
+	-- here so the demo is quick to try.
+	reloadCooldown = 30,
 	defaults = {
 		showPreview = false,
 		point = "CENTER",
@@ -97,7 +100,7 @@ debug:Text("A setting marked reload = true asks to reload the UI when it changes
 debug:Checkbox({
 	key = "exampleReload",
 	label = "Example: Needs a Reload",
-	tooltip = "Toggle it to see the prompt. Ignore stops it asking about this setting until the next reload.",
+	tooltip = "Toggle it to see the prompt. After Ignore, the prompt stays away for 30 seconds (the demo's reloadCooldown).",
 	reload = true,
 })
 debug:Button({

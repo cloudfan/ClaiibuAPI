@@ -103,7 +103,7 @@ Every `key` must exist in `defaults`, with a value of the same type. A page that
 | `page:FontShadow{}` | `key`, `label`, `tooltip` | `none`, `soft`, `hard`, `heavy` |
 | `page:Button{}` | `label`, `text`, `tooltip`, `width`, `onClick(kit)`, `enabled(kit)` | — |
 
-Add `reload = true` to any control with a `key` whose change can taint the UI until a reload (hiding, moving or hooking Blizzard frames, secure frames, toggling whole modules). Changing it then shows a **Reload UI / Ignore** dialog that names the changed settings. It compares against the value the UI loaded with, asks once per slider drag, also asks after profile switches, imports and Defaults, and **Ignore** stops asking about those settings until the next reload.
+Add `reload = true` to any control with a `key` whose change can taint the UI until a reload (hiding, moving or hooking Blizzard frames, secure frames, toggling whole modules). Changing it then shows a **Reload UI / Ignore** dialog that names the changed settings. It compares against the value the UI loaded with, asks once per slider drag, also asks after profile switches, imports and Defaults, and **Ignore** keeps the dialog away for a cooldown (config field `reloadCooldown`, seconds, default 300). While the dialog is open, further changes leave it as it is instead of reopening it.
 
 ### Kit calls
 
@@ -120,7 +120,7 @@ Add `reload = true` to any control with a `key` whose change can taint the UI un
 | `kit.events` | The addon's own event frame: `On(event, fn)`, `Register(map)`, `AfterCombat(key, fn)`, `Defer(key, fn, delay)` |
 | `kit:ProbeRows()` | Lines for a probe command |
 | `kit:ShowProbe()` | The probe in the copy window |
-| `kit:RequestReload(reason)` | Show the Reload UI / Ignore dialog from code, naming `reason` |
+| `kit:RequestReload(reason)` | Show the Reload UI / Ignore dialog from code, naming `reason`. Does nothing during the Ignore cooldown or while the dialog is open |
 | `kit:ShowCopy(title, content, keepCodes)` | Show a string or a list of lines in the copy window, titled with the addon's name. The text opens selected for Ctrl+C; color codes are removed unless `keepCodes` is true |
 | `kit:Print(...)` | Print with the addon's name |
 

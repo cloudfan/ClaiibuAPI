@@ -120,15 +120,27 @@ end
 -- Reload prompts -------------------------------------------------------------------
 -- Settings marked reload = true can leave the UI tainted (blocked actions)
 -- until a reload. When one of them differs from the value the UI loaded
--- with, the player is asked: Reload UI, or Ignore (that setting is not
--- asked about again this session).
+-- with, the player is asked: Reload UI, or Ignore. Ignore starts a cooldown
+-- (config.reloadCooldown seconds, default RELOAD_COOLDOWN) during which the
+-- prompt does not appear at all. A prompt that is already open is left as
+-- it is, never closed and reopened.
 
 local RELOAD_NOTE = "Changing this asks you to reload the UI."
+SK.RELOAD_COOLDOWN = 300
+
+local function Now()
+	return GetTime and GetTime() or 0
+end
+
+-- False while the Ignore cooldown runs.
+local function ReloadAllowed(kit)
+	return kit.ready and Now() >= kit.reloadCooldownUntil
+end
 
 local function ReloadPending(kit)
 	local changed = {}
 	for key, label in pairs(kit.reloadKeys) do
-		if not kit.reloadMuted[key] and not Serializer.DeepEqual(kit.settings[key], kit.reloadBaseline[key]) then
+		if not Serializer.DeepEqual(kit.settings[key], kit.reloadBaseline[key]) then
 			changed[#changed + 1] = { key = key, label = label }
 		end
 	end
@@ -144,6 +156,9 @@ local function CheckReload(kit)
 		return
 	end
 	kit.events.Defer("reloadPrompt", function()
+		if not ReloadAllowed(kit) then
+			return
+		end
 		local changed = ReloadPending(kit)
 		if #changed > 0 then
 			Profiles.PromptReload(kit, changed)
@@ -164,20 +179,17 @@ end
 -- Asks for a reload from addon code, e.g. after a change made outside the
 -- settings pages. reason is shown in the dialog.
 function Kit:RequestReload(reason)
-	if not self.ready then
+	if not ReloadAllowed(self) then
 		return
 	end
 	Profiles.PromptReload(self, { { key = false, label = reason or "A change in " .. self.title } })
 end
 
--- Called by the Ignore button: these settings are not asked about again
--- until the next reload.
-function Kit:MuteReload(changed)
-	for _, item in ipairs(changed) do
-		if item.key then
-			self.reloadMuted[item.key] = true
-		end
-	end
+-- Called by the Ignore button (and Esc): no reload prompt until the
+-- cooldown ends. A change after that asks again.
+function Kit:IgnoreReload()
+	local cooldown = tonumber(self.config.reloadCooldown) or SK.RELOAD_COOLDOWN
+	self.reloadCooldownUntil = Now() + math.max(0, cooldown)
 end
 
 -- Sets a setting from code. Keys must exist in the defaults, and the value
@@ -734,6 +746,7 @@ end
 --   onChange(key, value, kit)    after any setting changes
 --   onProfileChanged(kit)        after the active profile changes or is reset
 --   onMediaRegistered(kit)       after a SharedMedia pack registers media
+--   reloadCooldown     seconds after Ignore before the reload prompt can appear again (default 300)
 function SK.New(owner, config)
 	assert(type(owner) == "string", "ClaiibuAPI.Settings.New(addonName, config): pass your addon's name first (local addonName = ...)")
 	if kits[owner] then
@@ -754,7 +767,7 @@ function SK.New(owner, config)
 		pages = {},
 		reloadKeys = {},     -- key -> label, for settings marked reload = true
 		reloadBaseline = {}, -- their values when the UI loaded
-		reloadMuted = {},    -- keys the player chose to ignore this session
+		reloadCooldownUntil = 0, -- GetTime() before which Ignore keeps the prompt away
 		readyQueue = {},
 		-- The owning addon's own event frame. The addon may use it too.
 		events = SK.NewEvents(),

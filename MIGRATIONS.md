@@ -2,6 +2,22 @@
 
 Each entry is a prompt for an AI assistant. Paste the prompt, then the addon's `.toc` and `.lua` files under it. Newest first.
 
+## 1.3.0: reload prompt cooldown after Ignore
+
+```
+Update this World of Warcraft: Forever addon (Lua 5.1, ## Interface: 16001) for ClaiibuAPI 1.3.0's reload prompt changes.
+
+What changed in ClaiibuAPI: clicking Ignore on the "Reload UI / Ignore" prompt now starts a cooldown (default 300 seconds) during which the prompt does not appear at all, and an open prompt is never reopened. Before, Ignore muted only the listed settings until the next reload.
+
+1. Find the ClaiibuAPI.Settings.New(addonName, { ... }) call. If the addon has settings marked reload = true that players change often (for example while dragging or stepping through values), add reloadCooldown = <seconds> to the config table only when the default of 300 seconds is clearly wrong for it. Otherwise change nothing here.
+2. Find any code that works around repeated reload prompts: its own timers, flags, "already asked" checks, or StaticPopup_Hide/StaticPopup_Show calls around ns.kit:RequestReload. Remove them; ClaiibuAPI now handles both the cooldown and the open-prompt check.
+3. Keep every reload = true flag and every ns.kit:RequestReload call as they are. Keep the "if ns.kit.RequestReload then" guards.
+4. Keep ClaiibuAPI.Require(1, addonName). Older ClaiibuAPI versions ignore reloadCooldown, so no other check is needed. If you added reloadCooldown, add "Requires ClaiibuAPI 1.3.0 or newer for the reload prompt cooldown" to the README or notes.
+5. Do not change anything else. No new globals, no new event frames, no popups of the addon's own.
+
+Output every changed file in full (no fragments, no "rest unchanged"). If nothing needed to change, say so and output no files.
+```
+
 ## 1.2.0: reload prompt for settings that can cause taint
 
 ```
