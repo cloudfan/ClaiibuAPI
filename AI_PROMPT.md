@@ -72,7 +72,7 @@ Every other file of the addon must check `if not ns.kit then return end` at the 
 
 ## API (complete)
 
-`API.Settings.New(addonName, config)`: call once, at file scope. Config fields: `title` (default: the `.toc` Title), `version` (default: the `.toc` Version), `description`, `features` (list of strings), `savedVariable` (required), `charSavedVariable` (required), `defaults` (required), `onChange(key, value, kit)`, `onProfileChanged(kit)`, `onMediaRegistered(kit)`, `reloadCooldown` (seconds the reload prompt stays away after Ignore; default 300, leave unset unless asked). Do not set `footer`.
+`API.Settings.New(addonName, config)`: call once, at file scope. Config fields: `title` (default: the `.toc` Title), `version` (default: the `.toc` Version), `description`, `features` (list of strings), `savedVariable` (required), `charSavedVariable` (required), `defaults` (required), `onChange(key, value, kit)`, `onProfileChanged(kit)`, `onMediaRegistered(kit)`, `reloadCooldown` (seconds the reload prompt stays away after Ignore; default 60, leave unset unless asked). Do not set `footer`.
 
 `kit:AddPage(name)` returns a page. Each page appears under the addon in Options → AddOns. Page methods (all take one table unless noted):
 
@@ -113,8 +113,25 @@ Kit calls (only after `OnReady`):
 | `kit:Print(...)` | prints with the addon's name |
 | `kit:ProbeRows()` | list of strings describing client API support |
 | `kit:ShowProbe()` | shows the probe in a copy window (text selected, ready for Ctrl+C) |
+| `kit:AddEditMode(spec)` | Edit Mode support for a frame; returns a handle (see below) |
+| `kit:SetTemporary({ key = value })`, `kit:ClearTemporary(keys)`, `kit:GetSaved(key)` | values that apply but are never saved; `GetSaved` reads the saved value |
 | `kit:RequestReload(reason)` | shows the Reload UI / Ignore dialog from code, for taint-prone changes made outside the settings pages |
 | `kit:ShowCopy(title, linesOrString)` | shows any diagnostic text in the copy window; use it for every debug or diagnostic command instead of printing many chat lines. Never include secret values unchecked |
+
+Edit Mode: if the addon has a movable frame, add Edit Mode support with `kit:AddEditMode` in `Settings.lua`:
+
+```lua
+ns.editMode = kit:AddEditMode({
+	frame = function() return ns.root end,     -- the plain (non-secure) frame everything is anchored to
+	pointKey = "point", xKey = "x", yKey = "y", -- Anchor + two offset settings
+	regions = function() return { ns.root } end, -- every visible part the highlight should surround
+	temporary = { <key> = <value> },            -- settings that must be on while Edit Mode is open (e.g. show when solo)
+	onEnter = function(mover) end,              -- show previews or sample data
+	onExit = function(mover) end,               -- hide them
+})
+```
+
+Call `ns.editMode:UpdateBounds()` at the end of every layout pass. Place the frame with `kit:ApplyAnchor(ns.root, "point", "x", "y")` in `ns.ApplySettings()`. Never call `EditModeManagerFrame` methods, inherit `EditModeSystemSelectionTemplate`, or register an Edit Mode system: that taints Blizzard's Edit Mode.
 
 Applying media: for a backdrop use `bgFile = background.file`, `tile = background.tile`, `tileSize = background.tileSize`, `edgeFile = border.file`, `edgeSize = <size, or 0 when border.file is nil>`, then `frame:SetBackdropBorderColor(unpack(border.color))`. For a status bar use `bar:SetStatusBarTexture(kit:GetMedia("statusbar", "<key>").file)`. For positions use an `Anchor` setting plus two `Slider` offsets and `kit:ApplyAnchor`; if the frame is protected, wrap it in `kit.events.AfterCombat`.
 

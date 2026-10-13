@@ -21,15 +21,13 @@ local kit = API.Settings.New(addonName, {
 		"Sliders, checkboxes and dropdowns from Blizzard's own settings templates",
 		"Dropdowns with left and right steppers, listing Blizzard media first, then each LibSharedMedia pack under its own heading",
 		"Anchor point and font shadow selectors",
+		"Edit Mode: move the preview panel with Blizzard's blue and yellow highlight",
 		"Profiles saved as compact strings, shared across characters, with export and import",
 		"Diagnostics in a copy window, ready for Ctrl+C",
 		"A Reload UI / Ignore prompt for settings that can cause taint",
 	},
 	savedVariable = "ClaiibuAPIDemoDB",
 	charSavedVariable = "ClaiibuAPIDemoCharDB",
-	-- Seconds the reload prompt stays away after Ignore (default 300). Short
-	-- here so the demo is quick to try.
-	reloadCooldown = 30,
 	defaults = {
 		showPreview = false,
 		point = "CENTER",
@@ -65,6 +63,7 @@ local general = kit:AddPage("General")
 general:Header("Preview")
 general:Checkbox({ key = "showPreview", label = "Show Preview Panel", tooltip = "A small panel that uses the settings below." })
 general:Header("Position")
+general:Text("Open Edit Mode to drag the panel. It is shown while Edit Mode is open even when Show Preview Panel is off.")
 general:Anchor({ key = "point", tooltip = "The corner or edge of the screen the panel is attached to." })
 general:Slider({ key = "x", label = "X Offset", min = -800, max = 800, step = 5 })
 general:Slider({ key = "y", label = "Y Offset", min = -500, max = 500, step = 5 })
@@ -100,7 +99,7 @@ debug:Text("A setting marked reload = true asks to reload the UI when it changes
 debug:Checkbox({
 	key = "exampleReload",
 	label = "Example: Needs a Reload",
-	tooltip = "Toggle it to see the prompt. After Ignore, the prompt stays away for 30 seconds (the demo's reloadCooldown).",
+	tooltip = "Toggle it to see the prompt. After Ignore, the prompt stays away for 60 seconds (set it with reloadCooldown).",
 	reload = true,
 })
 debug:Button({
@@ -199,7 +198,23 @@ function Demo.Apply()
 	panel.bar:SetStatusBarColor(0.1, 0.7, 0.1)
 
 	kit:ApplyFont(panel.text, "font", "fontSize", "fontShadow")
+	Demo.editMode:UpdateBounds()
 end
+
+-- Edit Mode: the panel gets Blizzard's blue highlight while Edit Mode is open,
+-- and dragging it saves "x" and "y" (the panel keeps its anchor point).
+-- temporary shows the panel only while Edit Mode is open; the saved setting
+-- is not touched.
+Demo.editMode = kit:AddEditMode({
+	frame = function()
+		return panel
+	end,
+	label = "ClaiibuAPI Demo",
+	pointKey = "point",
+	xKey = "x",
+	yKey = "y",
+	temporary = { showPreview = true },
+})
 
 kit:OnReady(Demo.Apply)
 

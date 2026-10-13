@@ -2,6 +2,32 @@
 
 Each entry is a prompt for an AI assistant. Paste the prompt, then the addon's `.toc` and `.lua` files under it. Newest first.
 
+## 1.4.0: Edit Mode support, temporary values, 60-second reload cooldown
+
+```
+Update this World of Warcraft: Forever addon (Lua 5.1, ## Interface: 16001) to use ClaiibuAPI 1.4.0's Edit Mode support.
+
+1. Find the addon's own Edit Mode or mover code: anything using EventRegistry "EditMode.Enter"/"EditMode.Exit", EditModeManagerFrame, hooksecurefunc on Edit Mode, its own drag handles, highlight textures, StartMoving/StopMovingOrSizing on its main frame, or a "move"/"unlock" mode. Remove it; ClaiibuAPI replaces it. Remove any call into EditModeManagerFrame methods and any frame inheriting EditModeSystemSelectionTemplate, since those taint Edit Mode.
+2. Make sure the position is stored as three settings in defaults: an anchor point and two offsets (for example point = "CENTER", x = 0, y = 0). If the addon stored its position differently, convert it once in kit:OnReady and keep the old values only for that conversion.
+3. In Settings.lua, after the pages, add:
+   ns.editMode = kit.AddEditMode and kit:AddEditMode({
+       frame = function() return <the plain, non-secure root frame> end,
+       pointKey = "<point key>", xKey = "<x key>", yKey = "<y key>",
+       regions = function() return { <every visible part of the frame, including parts that stick out> } end,
+       temporary = { <settings that must be on while Edit Mode is open, e.g. show when solo, show preview> },
+       onEnter = function() <show sample/preview frames if the addon has them> end,
+       onExit = function() <hide them> end,
+   })
+   Leave out temporary, onEnter and onExit if they are not needed.
+4. Place the root with kit:ApplyAnchor(root, "<point key>", "<x key>", "<y key>") in the layout code, outside combat if anything secure is anchored to it, and end every layout pass with: if ns.editMode then ns.editMode:UpdateBounds() end
+5. Replace any "show while unlocked/moving" flags that existed only for moving the frame with the temporary table from step 3.
+6. If the addon set reloadCooldown = 300 only to copy the old default, remove it (the default is now 60).
+7. Keep ClaiibuAPI.Require(1, addonName). The "kit.AddEditMode and" guard keeps older ClaiibuAPI versions working without Edit Mode. Add "Requires ClaiibuAPI 1.4.0 or newer for Edit Mode" to the README or notes.
+8. Do not change anything else. No new globals, no new event frames.
+
+Output every changed file in full (no fragments, no "rest unchanged"), then list: the root frame, the position keys, the regions, and the temporary settings you chose.
+```
+
 ## 1.3.0: reload prompt cooldown after Ignore
 
 ```

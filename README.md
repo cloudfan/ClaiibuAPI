@@ -17,6 +17,7 @@ Shared code for World of Warcraft: Forever addons (`## Interface: 16001`). Claii
 - **Media dropdowns** (Font, Bar Texture, Border, Background, Sound) as one scrolling column. A **Blizzard** section comes first, including Bronze and Gold Toast borders and a Bronze Dialog border. After it come one section per addon that registered media with LibSharedMedia-3.0, titled with that addon's name.
 - **Selectors** for the anchor point (TOP LEFT, TOP CENTER, TOP RIGHT, LEFT CENTER, CENTER, RIGHT CENTER, BOTTOM LEFT, BOTTOM CENTER, BOTTOM RIGHT) and the font shadow (None, Soft, Hard, Heavy).
 - **Profiles** stored as compact strings. **Default-Global** holds the defaults. The Profiles page has Save, Delete, an Export box and an Import button.
+- **Edit Mode support**: frames move in Blizzard's Edit Mode with its blue and yellow highlight, and settings can be switched on only while Edit Mode is open.
 - **A reload prompt** (Reload UI / Ignore) for settings marked `reload = true`, whose changes can taint the UI until a reload.
 - **A copy window** for diagnostic commands: the text opens already selected, so Ctrl+C copies it.
 - **A standard landing page**: the name and version, a description and features, and the footer "Created for use by a lazy sack of shit, Maiibu. (And Friends)".
@@ -103,7 +104,7 @@ Every `key` must exist in `defaults`, with a value of the same type. A page that
 | `page:FontShadow{}` | `key`, `label`, `tooltip` | `none`, `soft`, `hard`, `heavy` |
 | `page:Button{}` | `label`, `text`, `tooltip`, `width`, `onClick(kit)`, `enabled(kit)` | — |
 
-Add `reload = true` to any control with a `key` whose change can taint the UI until a reload (hiding, moving or hooking Blizzard frames, secure frames, toggling whole modules). Changing it then shows a **Reload UI / Ignore** dialog that names the changed settings. It compares against the value the UI loaded with, asks once per slider drag, also asks after profile switches, imports and Defaults, and **Ignore** keeps the dialog away for a cooldown (config field `reloadCooldown`, seconds, default 300). While the dialog is open, further changes leave it as it is instead of reopening it.
+Add `reload = true` to any control with a `key` whose change can taint the UI until a reload (hiding, moving or hooking Blizzard frames, secure frames, toggling whole modules). Changing it then shows a **Reload UI / Ignore** dialog that names the changed settings. It compares against the value the UI loaded with, asks once per slider drag, also asks after profile switches, imports and Defaults, and **Ignore** keeps the dialog away for a cooldown (config field `reloadCooldown`, seconds, default 60). While the dialog is open, further changes leave it as it is instead of reopening it.
 
 ### Kit calls
 
@@ -120,6 +121,9 @@ Add `reload = true` to any control with a `key` whose change can taint the UI un
 | `kit.events` | The addon's own event frame: `On(event, fn)`, `Register(map)`, `AfterCombat(key, fn)`, `Defer(key, fn, delay)` |
 | `kit:ProbeRows()` | Lines for a probe command |
 | `kit:ShowProbe()` | The probe in the copy window |
+| `kit:AddEditMode(spec)` | Edit Mode support for a frame; see [Edit Mode](#edit-mode). Returns a handle |
+| `kit:SetTemporary(values)` / `kit:ClearTemporary(keys)` | Give settings values that apply but are never saved; clear them (all when `keys` is nil) |
+| `kit:GetSaved(key)` | The saved value of a setting, ignoring temporary values |
 | `kit:RequestReload(reason)` | Show the Reload UI / Ignore dialog from code, naming `reason`. Does nothing during the Ignore cooldown or while the dialog is open |
 | `kit:ShowCopy(title, content, keepCodes)` | Show a string or a list of lines in the copy window, titled with the addon's name. The text opens selected for Ctrl+C; color codes are removed unless `keepCodes` is true |
 | `kit:Print(...)` | Print with the addon's name |
@@ -136,8 +140,93 @@ Add `reload = true` to any control with a `key` whose change can taint the UI un
 | `Media.Get`, `Media.Options`, `Media.PlaySound`, `Media.ApplyFont`, `Media.SHADOWS`, `Media.KINDS` | Media without a kit |
 | `Serializer.Encode`, `Serializer.Decode` | The profile string format, for other data |
 | `Compat.IsSecret`, `Compat.TemplateExists`, `Compat.AtlasExists`, `Compat.ProbeRows` | Capability checks |
+| `EditMode.New(addonName, spec)`, `EditMode.IsActive()` | Edit Mode movers without a kit (needs `getPosition`/`savePosition`); whether Blizzard's Edit Mode is open |
 | `NewEvents()` | An event frame with a handler table, for an addon without a settings window |
 | `ShowCopyText(title, content, keepCodes)`, `HideCopyText()` | The copy window without a kit |
+
+## Edit Mode
+
+Let players move an addon frame in Blizzard's Edit Mode, with a highlight drawn like Blizzard's own: blue while Edit Mode is open, yellow with the addon's name when clicked. Dragging saves the position.
+
+### 1. Settings
+
+The position is an anchor point plus two offsets. Add them to `defaults`, and optionally show them on a page:
+
+```lua
+defaults = { point = "CENTER", x = 0, y = 0, showSolo = false },
+...
+page:Anchor({ key = "point" })
+page:Slider({ key = "x", label = "X Offset", min = -1000, max = 1000, step = 1 })
+page:Slider({ key = "y", label = "Y Offset", min = -1000, max = 1000, step = 1 })
+```
+
+### 2. Register the frame
+
+```lua
+local mover = kit:AddEditMode({
+	frame = function() return ns.root end,
+	label = "My Addon",
+	pointKey = "point", xKey = "x", yKey = "y",
+	regions = function() return { ns.root, ns.nameplate } end,
+	temporary = { showSolo = true },
+	onEnter = function(mover) ns.ShowPreview(true) end,
+	onExit = function(mover) ns.ShowPreview(false) end,
+})
+```
+
+| Field | Required | What it does |
+| --- | --- | --- |
+| `frame` | yes | The frame to move, or a function returning it (for frames created later). A plain, non-secure frame that everything else is anchored to. |
+| `label` | no | The name on the selected (yellow) highlight. Default: the addon's title. |
+| `pointKey`, `xKey`, `yKey` | no | The settings holding the position. Default `"point"`, `"x"`, `"y"`. Each must be in `defaults`. |
+| `getPosition()`, `savePosition(point, x, y)` | no | Use these instead of settings keys. Required with `ClaiibuAPI.EditMode.New` (no kit). |
+| `regions()` | no | Returns the regions the highlight surrounds: every visible part, including parts that stick out. Default: `{ frame }`. Padding is 6. |
+| `temporary` | no | `{ key = value }`: settings that hold these values only while Edit Mode is open, for example to show the frame when it is normally hidden. Never saved. |
+| `onEnter(mover)`, `onExit(mover)` | no | Run when Edit Mode opens and closes, after `temporary` is applied and before it is cleared. Show and hide previews here. |
+| `reanchor` | no | `false` to skip placing the frame after a drag (place it yourself in `onChange`). |
+
+### 3. Keep it in step
+
+```lua
+function ns.Layout()
+	kit:ApplyAnchor(ns.root, "point", "x", "y")  -- out of combat for secure children
+	-- ... size and lay out the parts ...
+	mover:UpdateBounds()                         -- re-fit the highlight, one frame later
+end
+```
+
+Call `ns.Layout()` from `onChange`, `onProfileChanged` and `kit:OnReady`.
+
+### What happens
+
+| When | ClaiibuAPI |
+| --- | --- |
+| Edit Mode opens | Applies `temporary` (each changed key goes through `onChange`), calls `onEnter`, shows the blue highlight around `regions()`. |
+| Click on the highlight | Turns it yellow and shows `label`; deselects every other addon's highlight. |
+| Drag | Moves the frame (`StartMoving`, outside combat only). |
+| Drop | Stores offsets from the saved anchor point with `kit:Set(xKey)`/`kit:Set(yKey)`, then places the frame with `SetPoint(point, UIParent, point, x, y)`. |
+| Blizzard frame selected, or selection cleared | Back to blue, label hidden. |
+| Combat starts mid-drag | Ends the drag and saves it (`PLAYER_REGEN_DISABLED`). |
+| Edit Mode closes | Hides the highlight, clears `temporary`, calls `onExit`. |
+
+### Handle
+
+| Call | What it does |
+| --- | --- |
+| `mover:UpdateBounds()` | Re-fit the highlight after a layout change |
+| `mover:ApplyPosition()` | Place the frame at its saved position (after combat if needed) |
+| `mover:IsActive()`, `mover:IsSelected()` | Edit Mode open for this frame; highlight selected |
+| `mover:Deselect()` | Back to blue |
+
+### Temporary values without Edit Mode
+
+`kit:SetTemporary({ key = value })` and `kit:ClearTemporary(keys)` work on their own too. The addon sees the temporary value in `kit.settings`; settings pages, profiles and the reload prompt use the saved value (`kit:GetSaved(key)`).
+
+### Rules
+
+- Never call `EditModeManagerFrame` methods, inherit `EditModeSystemSelectionTemplate`, or register an Edit Mode system. ClaiibuAPI only listens (`EventRegistry` "EditMode.Enter"/"EditMode.Exit" and post-hooks), and the addon must not do more.
+- The moved frame must not be secure. Secure children are fine, but place the root outside combat (`kit:ApplyAnchor` inside `kit.events.AfterCombat` when needed).
+- The yellow colors are estimates; the blue ones were measured on Forever build 70338.
 
 ## Profiles
 
@@ -161,6 +250,7 @@ Add `reload = true` to any control with a `key` whose change can taint the UI un
 Nothing has been run in game yet. Run `/capi probe` on your build and check:
 
 - `Settings.RegisterCanvasLayoutCategory`/`Subcategory`. Without the Settings API, the pages open in a standalone window with the same list down the left.
+- `EventRegistry` "EditMode.Enter"/"EditMode.Exit" and `EditModeManagerFrame.SelectSystem`/`ClearSelectedSystem` (Edit Mode). The probe shows whether ClaiibuAPI is listening.
 - `BasicFrameTemplateWithInset` (the copy window's frame; a plain dialog frame is used without it).
 - `SettingsCheckboxTemplate`, `SettingsDropdownWithButtonsTemplate` (and its `Dropdown`, `DecrementButton`, `IncrementButton` children), `MinimalSliderWithSteppersTemplate`, `ScrollFrameTemplate`, `InputScrollFrameTemplate`.
 - The `OnDefault`/`OnRefresh` hooks that the settings panel calls on a canvas frame.

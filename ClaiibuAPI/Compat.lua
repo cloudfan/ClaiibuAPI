@@ -110,6 +110,9 @@ function C.ProbeRows(kit)
 		"ScrollFrameTemplate: " .. Known(C.TemplateExists("ScrollFrameTemplate")),
 		"StaticPopup_Show: " .. Has(StaticPopup_Show),
 		"BasicFrameTemplateWithInset (copy window): " .. Known(C.TemplateExists("BasicFrameTemplateWithInset")),
+		"EventRegistry (Edit Mode callbacks): " .. Has(EventRegistry and EventRegistry.RegisterCallback)
+			.. (SK.EditMode and SK.EditMode.listening and ", listening" or ""),
+		"EditModeManagerFrame (selection hooks): " .. Has(EditModeManagerFrame),
 		"SOUNDKIT: " .. Has(SOUNDKIT),
 		"C_AddOns.GetAddOnMetadata: " .. Has(C_AddOns and C_AddOns.GetAddOnMetadata),
 		"LibSharedMedia-3.0: " .. (SK.Media.LSM() and "loaded" or "not loaded (optional)"),

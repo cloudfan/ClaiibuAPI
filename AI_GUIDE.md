@@ -8,7 +8,7 @@ This file is kept in step with the API. Every feature lists the version that add
 
 =====
 
-You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.3.0, API level 1. Repository: `cloudfan/ClaiibuAPI`.
+You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.4.0, API level 1. Repository: `cloudfan/ClaiibuAPI`.
 
 ## How to answer
 
@@ -65,7 +65,7 @@ kit:OnReady(function() ns.Apply() end)
 
 - Config: `title` and `version` default to the `.toc`; `description` and `features` fill the landing page; `defaults` lists every setting.
 - `onChange` runs after any setting changes, `onProfileChanged` after a profile switch, delete, import or reset, `onMediaRegistered` when a LibSharedMedia pack registers media late.
-- `reloadCooldown` (seconds, default 300) is how long the reload prompt stays away after the player clicks Ignore (see F20).
+- `reloadCooldown` (seconds, default 60) is how long the reload prompt stays away after the player clicks Ignore (see F20).
 - Gotcha: settings exist only after `ADDON_LOADED`. Read them in `kit:OnReady`, never at file scope.
 - Gotcha: calling `New` twice for one addon raises an error.
 
@@ -235,7 +235,7 @@ ClaiibuAPI.HideCopyText()
 - Gotcha: never put secret values in it (unit names or health can be secret on Forever). Check them with `ClaiibuAPI.Compat.IsSecret(value)` first, and write something like "(secret)" instead.
 - Unverified on Forever: `BasicFrameTemplateWithInset` for the frame (a plain dialog frame is used without it) and `InputScrollFrameTemplate` for the box.
 
-### F20. Reload prompt for settings that can cause taint (since 1.2.0; Ignore cooldown since 1.3.0)
+### F20. Reload prompt for settings that can cause taint (since 1.2.0; Ignore cooldown since 1.3.0, default 60 seconds since 1.4.0)
 
 Some changes can leave the UI tainted until a reload: Blizzard's code then hits "Interface action failed because of an AddOn" or blocked actions. Typical cases are settings that hide, move, reparent or hook Blizzard frames, change secure or protected frames, or switch a whole module on or off. Mark those settings with `reload = true`. When one of them changes, ClaiibuAPI shows a dialog naming the changed settings, with **Reload UI** and **Ignore**.
 
@@ -249,13 +249,61 @@ kit:RequestReload("Click casting was turned on")   -- from addon code
 - The prompt compares against the value the UI loaded with: changing a setting and changing it back asks nothing.
 - It waits a moment after the last change, so dragging a slider asks once.
 - Profile switches, imports, deletes and Defaults ask too, if they change a marked setting.
-- **Reload UI** saves the profile and calls `ReloadUI()`. **Ignore** (or Esc) starts a cooldown: for 5 minutes the prompt does not appear at all, whatever changes. A change after the cooldown asks again. The change itself always applies.
-- Set the cooldown per addon with the config field `reloadCooldown` (seconds, default 300): `API.Settings.New(addonName, { ..., reloadCooldown = 120 })`.
+- **Reload UI** saves the profile and calls `ReloadUI()`. **Ignore** (or Esc) starts a cooldown: for 60 seconds the prompt does not appear at all, whatever changes. A change after the cooldown asks again. The change itself always applies.
+- Set the cooldown per addon with the config field `reloadCooldown` (seconds, default 60): `API.Settings.New(addonName, { ..., reloadCooldown = 120 })`.
 - While the prompt is open, further changes leave it as it is; it is never closed and reopened. ClaiibuAPI also never replaces one of its other open dialogs (profile save, overwrite, delete) with the prompt.
 - `kit:RequestReload(reason)` shows the same dialog with `reason` as the changed item, for changes made outside the settings pages. It follows the same cooldown and does nothing while the prompt is open.
 - Gotcha: the setting still has to apply what it can at once (or on next login) in `onChange`; the prompt does not undo or delay it. If the change is not safe in combat, wrap it in `kit.events.AfterCombat`.
 - Gotcha: don't mark purely visual settings (colors, fonts, sizes of the addon's own plain frames); the prompt would only annoy players.
 - Unverified on Forever: the `RELOADUI`/`IGNORE` button labels (English text is used if missing) and StaticPopup's `OnCancel` reason values.
+
+### F21. Edit Mode support (since 1.4.0)
+
+Lets players move an addon frame in Blizzard's Edit Mode. While Edit Mode is open, the frame gets a blue highlight like Blizzard's own systems; clicking it turns it yellow with the addon's name centered on it; dragging moves the frame and saves the new position. Clicking a Blizzard frame or closing Edit Mode deselects it.
+
+```lua
+-- Settings: an anchor point and two offsets (see F10).
+defaults = { point = "CENTER", x = 0, y = 0, showSolo = false, ... }
+
+local mover = kit:AddEditMode({
+	frame = function() return ns.root end,     -- the frame to move, or the frame itself
+	label = "My Addon",                         -- default: the addon's title
+	pointKey = "point", xKey = "x", yKey = "y", -- defaults shown
+	regions = function() return { ns.root, ns.petFrame } end, -- what the highlight surrounds
+	temporary = { showSolo = true },            -- only while Edit Mode is open (F22)
+	onEnter = function(mover) ns.ShowPreview(true) end,
+	onExit = function(mover) ns.ShowPreview(false) end,
+})
+
+function ns.Layout()                            -- the addon's own layout pass
+	kit:ApplyAnchor(ns.root, "point", "x", "y")
+	mover:UpdateBounds()                        -- re-fit the highlight after any layout change
+end
+```
+
+- Dropping the frame keeps the saved anchor point and stores `x`/`y` as offsets from that point on `UIParent`, through `kit:Set` (so `onChange` runs), then places the frame with `SetPoint(point, UIParent, point, x, y)`. Set `reanchor = false` to place it yourself.
+- The handle has `UpdateBounds()`, `ApplyPosition()`, `IsActive()`, `IsSelected()` and `Deselect()`. `ClaiibuAPI.EditMode.IsActive()` says whether Blizzard's Edit Mode is open.
+- Without a kit: `ClaiibuAPI.EditMode.New(addonName, { frame = ..., getPosition = function() return point, x, y end, savePosition = function(point, x, y) ... end })`. `temporary` needs a kit; use `onEnter`/`onExit` instead.
+- Several movers per addon are fine; selecting one deselects every other, from any addon.
+- Taint: ClaiibuAPI only listens to Blizzard's Edit Mode (`EventRegistry` callbacks and post-hooks on `SelectSystem`/`ClearSelectedSystem`). It never calls `EditModeManagerFrame`, inherits Edit Mode templates or registers a system. Don't do any of those in the addon either.
+- Combat: dragging needs no combat lockdown; a drag in progress is ended and saved on `PLAYER_REGEN_DISABLED`, and the frame is re-placed after combat if needed.
+- Gotcha: the frame must be a plain (non-secure) frame that everything else is anchored to. A secure frame can't be moved this way in combat.
+- Gotcha: call `mover:UpdateBounds()` at the end of every layout pass, or the highlight keeps its old size.
+- Unverified on Forever: the yellow "selected" colors are estimates (the blue ones were measured on build 70338); `EventRegistry` "EditMode.Enter"/"EditMode.Exit" and the two manager methods are guarded and reported by the probe.
+
+### F22. Temporary values (since 1.4.0)
+
+`kit:SetTemporary({ key = value })` gives settings a value that the addon sees in `kit.settings` but that is never saved; `kit:ClearTemporary(keys)` (or no argument, for all) puts the saved values back. `onChange` runs for each setting whose value actually changes. Edit Mode's `temporary` uses this, so "Show when solo" and similar can be switched on just while Edit Mode is open.
+
+```lua
+kit:SetTemporary({ showSolo = true, showPets = true })
+kit:ClearTemporary({ "showSolo", "showPets" })
+local real = kit:GetSaved("showSolo")   -- the saved value, ignoring temporary ones
+```
+
+- Settings pages show and change the saved value. Changing a setting that has a temporary value changes the saved value only; the temporary one stays until cleared.
+- Profile switches, imports, Defaults and Save keep temporary values out of the saved strings and put them back on top afterwards.
+- The reload prompt (F20) compares saved values, so a temporary value never asks for a reload.
 
 ### Not yet verified on Forever
 

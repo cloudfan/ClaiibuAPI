@@ -102,7 +102,18 @@ end
 
 -- Writes the live settings into the active profile's string.
 function Profiles.Flush(kit)
-	local text, err = Serializer.EncodeSettings(kit.settings, kit.defaults)
+	-- Temporary values (kit:SetTemporary) are never saved.
+	local settings = kit.settings
+	if kit.tempOriginals and next(kit.tempOriginals) then
+		settings = {}
+		for key, value in pairs(kit.settings) do
+			settings[key] = value
+		end
+		for key, original in pairs(kit.tempOriginals) do
+			settings[key] = original
+		end
+	end
+	local text, err = Serializer.EncodeSettings(settings, kit.defaults)
 	if not text then
 		kit:Print("Could not save the settings: " .. tostring(err))
 		return false
@@ -128,7 +139,8 @@ function Profiles.SaveAs(kit, name, text)
 		return false
 	end
 	Profiles.Flush(kit)
-	text = text or Serializer.EncodeSettings(kit.settings, kit.defaults)
+	-- The flushed string holds the real values, without temporary ones.
+	text = text or kit.db.profiles[Profiles.Active(kit)]
 	if not text then
 		return false
 	end
@@ -186,6 +198,9 @@ end
 -- Puts every setting of the active profile back to its default.
 function Profiles.ResetActive(kit)
 	kit.settings = Serializer.DeepCopy(kit.defaults)
+	-- Save the defaults as they are; kit:ProfileChanged puts any temporary
+	-- values back on top.
+	kit.tempOriginals = {}
 	Profiles.Flush(kit)
 	kit:ProfileChanged()
 end

@@ -66,6 +66,15 @@ API.Compat = {
 API.ShowCopyText = SK.CopyWindow.Show
 API.HideCopyText = SK.CopyWindow.Hide
 
+-- Edit Mode movers without a settings kit (kits use kit:AddEditMode).
+-- New(addonName, spec) needs spec.getPosition and spec.savePosition.
+API.EditMode = {
+	New = function(owner, spec)
+		return SK.EditMode.New(owner, spec)
+	end,
+	IsActive = SK.EditMode.IsActive, -- true while Blizzard's Edit Mode is open
+}
+
 -- An event frame with a handler table, AfterCombat and Defer, for an addon
 -- that wants one without a settings window. kit.events is one of these.
 API.NewEvents = SK.NewEvents

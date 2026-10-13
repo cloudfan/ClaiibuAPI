@@ -126,7 +126,7 @@ end
 -- it is, never closed and reopened.
 
 local RELOAD_NOTE = "Changing this asks you to reload the UI."
-SK.RELOAD_COOLDOWN = 300
+SK.RELOAD_COOLDOWN = 60
 
 local function Now()
 	return GetTime and GetTime() or 0
@@ -140,7 +140,7 @@ end
 local function ReloadPending(kit)
 	local changed = {}
 	for key, label in pairs(kit.reloadKeys) do
-		if not Serializer.DeepEqual(kit.settings[key], kit.reloadBaseline[key]) then
+		if not Serializer.DeepEqual(kit:GetSaved(key), kit.reloadBaseline[key]) then
 			changed[#changed + 1] = { key = key, label = label }
 		end
 	end
@@ -176,6 +176,21 @@ local function Changed(kit, key, value)
 	end
 end
 
+-- Writes a setting. While a temporary value covers the key, only the real
+-- (saved) value changes and the addon keeps seeing the temporary one.
+function SK.WriteSetting(kit, key, value)
+	if kit.tempOriginals[key] ~= nil then
+		kit.tempOriginals[key] = value
+		Profiles.Flush(kit)
+		if kit.reloadKeys[key] then
+			CheckReload(kit)
+		end
+		return
+	end
+	kit.settings[key] = value
+	Changed(kit, key, value)
+end
+
 -- Asks for a reload from addon code, e.g. after a change made outside the
 -- settings pages. reason is shown in the dialog.
 function Kit:RequestReload(reason)
@@ -202,9 +217,86 @@ function Kit:Set(key, value)
 	if default == nil or type(value) ~= type(default) then
 		error(self.addonName .. ": no setting " .. tostring(key) .. " of type " .. type(value), 2)
 	end
-	self.settings[key] = value
-	Changed(self, key, value)
+	SK.WriteSetting(self, key, value)
 	self:Refresh()
+end
+
+-- Temporary values ---------------------------------------------------------------
+-- A temporary value replaces a setting in kit.settings (what the addon
+-- reads) without being saved: the profile keeps the real value, which comes
+-- back when the temporary value is cleared. Edit Mode uses this to switch
+-- things on only while it is open. A setting changed by the player while a
+-- temporary value is active changes the real value; the temporary one stays
+-- until it is cleared.
+
+-- The value the profile holds, ignoring temporary values.
+function Kit:GetSaved(key)
+	local original = self.tempOriginals[key]
+	if original ~= nil then
+		return original
+	end
+	return self.settings[key]
+end
+
+-- values is { key = value }. Keys not in the defaults, or values of the
+-- wrong type, are skipped. Calls onChange for each key that changes.
+function Kit:SetTemporary(values)
+	if not self.ready then
+		return
+	end
+	for key, value in pairs(values) do
+		local default = self.defaults[key]
+		if default ~= nil and type(value) == type(default) then
+			if self.tempOriginals[key] == nil then
+				self.tempOriginals[key] = self.settings[key]
+			end
+			self.tempValues[key] = value
+			if not Serializer.DeepEqual(self.settings[key], value) then
+				self.settings[key] = value
+				if self.config.onChange then
+					self.config.onChange(key, value, self)
+				end
+			end
+		end
+	end
+end
+
+-- keys is a list of keys, or nil for every temporary value.
+function Kit:ClearTemporary(keys)
+	if not self.ready then
+		return
+	end
+	local list = keys
+	if not list then
+		list = {}
+		for key in pairs(self.tempOriginals) do
+			list[#list + 1] = key
+		end
+	end
+	for _, key in ipairs(list) do
+		local original = self.tempOriginals[key]
+		if original ~= nil then
+			self.tempOriginals[key], self.tempValues[key] = nil, nil
+			if not Serializer.DeepEqual(self.settings[key], original) then
+				self.settings[key] = original
+				if self.config.onChange then
+					self.config.onChange(key, original, self)
+				end
+			end
+		end
+	end
+end
+
+-- After a profile switch, import or reset: the new profile's values become
+-- the real ones and the temporary values go back on top.
+local function ReapplyTemporary(kit)
+	if not next(kit.tempValues) then
+		return
+	end
+	for key, value in pairs(kit.tempValues) do
+		kit.tempOriginals[key] = kit.settings[key]
+		kit.settings[key] = value
+	end
 end
 
 -- The media entry a media setting points at (see Media.Get).
@@ -251,6 +343,7 @@ function Kit:GetActiveProfile()
 end
 
 function Kit:ProfileChanged()
+	ReapplyTemporary(self)
 	if self.config.onProfileChanged then
 		self.config.onProfileChanged(self)
 	end
@@ -300,12 +393,12 @@ local function Bind(kit, spec, defaultLabel)
 		kit.reloadKeys[key] = spec.label or defaultLabel or key
 		bound.tooltip = spec.tooltip and (spec.tooltip .. "\n\n" .. RELOAD_NOTE) or RELOAD_NOTE
 	end
+	-- Controls show and change the saved value, not a temporary one.
 	bound.get = bound.get or function()
-		return kit.settings[key]
+		return kit:GetSaved(key)
 	end
 	bound.set = bound.set or function(value)
-		kit.settings[key] = value
-		Changed(kit, key, value)
+		SK.WriteSetting(kit, key, value)
 	end
 	return bound
 end
@@ -715,6 +808,13 @@ function Kit:ProfilesIndex()
 	return #self.pageSpecs + 2
 end
 
+-- Edit Mode support for one of the addon's frames; see EditMode.lua for
+-- spec. Call at file scope or later. Returns a handle with UpdateBounds,
+-- ApplyPosition, IsActive, IsSelected and Deselect.
+function Kit:AddEditMode(spec)
+	return SK.EditMode.New(self.addonName, spec, self)
+end
+
 function Kit:ProbeRows()
 	return C.ProbeRows(self)
 end
@@ -746,7 +846,7 @@ end
 --   onChange(key, value, kit)    after any setting changes
 --   onProfileChanged(kit)        after the active profile changes or is reset
 --   onMediaRegistered(kit)       after a SharedMedia pack registers media
---   reloadCooldown     seconds after Ignore before the reload prompt can appear again (default 300)
+--   reloadCooldown     seconds after Ignore before the reload prompt can appear again (default 60)
 function SK.New(owner, config)
 	assert(type(owner) == "string", "ClaiibuAPI.Settings.New(addonName, config): pass your addon's name first (local addonName = ...)")
 	if kits[owner] then
@@ -768,6 +868,8 @@ function SK.New(owner, config)
 		reloadKeys = {},     -- key -> label, for settings marked reload = true
 		reloadBaseline = {}, -- their values when the UI loaded
 		reloadCooldownUntil = 0, -- GetTime() before which Ignore keeps the prompt away
+		tempOriginals = {},  -- key -> saved value hidden by a temporary value
+		tempValues = {},     -- key -> temporary value
 		readyQueue = {},
 		-- The owning addon's own event frame. The addon may use it too.
 		events = SK.NewEvents(),
