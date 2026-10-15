@@ -18,6 +18,7 @@ Shared code for World of Warcraft: Forever addons (`## Interface: 16001`). Claii
 - **Selectors** for the anchor point (TOP LEFT, TOP CENTER, TOP RIGHT, LEFT CENTER, CENTER, RIGHT CENTER, BOTTOM LEFT, BOTTOM CENTER, BOTTOM RIGHT) and the font shadow (None, Soft, Hard, Heavy).
 - **Profiles** stored as compact strings. **Default-Global** holds the defaults. The Profiles page has Save, Delete, an Export box and an Import button.
 - **Edit Mode support**: frames move in Blizzard's Edit Mode with its blue and yellow highlight, and settings can be switched on only while Edit Mode is open.
+- **A dispellable debuff tracker** that is safe in combat: `ClaiibuAPI.Dispel.Get(unit)` gives the first debuff on a unit that you can dispel, with its name, type and color.
 - **A reload prompt** (Reload UI / Ignore) for settings marked `reload = true`, whose changes can taint the UI until a reload.
 - **A copy window** for diagnostic commands: the text opens already selected, so Ctrl+C copies it.
 - **A standard landing page**: the name and version, a description and features, and the footer "Created for use by a lazy sack of shit, Maiibu. (And Friends)".
@@ -141,6 +142,7 @@ Add `reload = true` to any control with a `key` whose change can taint the UI un
 | `Serializer.Encode`, `Serializer.Decode` | The profile string format, for other data |
 | `Compat.IsSecret`, `Compat.TemplateExists`, `Compat.AtlasExists`, `Compat.ProbeRows` | Capability checks |
 | `EditMode.New(addonName, spec)`, `EditMode.IsActive()` | Edit Mode movers without a kit (needs `getPosition`/`savePosition`); whether Blizzard's Edit Mode is open |
+| `Dispel.Get(unit, mode)`, `Dispel.Has`, `Dispel.ColorFor(type)`, `Dispel.COLORS`, `Dispel.OnChange(fn)`, `Dispel.IsSupported()` | The dispellable debuff tracker; see [Dispellable debuffs](#dispellable-debuffs) |
 | `NewEvents()` | An event frame with a handler table, for an addon without a settings window |
 | `ShowCopyText(title, content, keepCodes)`, `HideCopyText()` | The copy window without a kit |
 
@@ -228,6 +230,52 @@ Call `ns.Layout()` from `onChange`, `onProfileChanged` and `kit:OnReady`.
 - The moved frame must not be secure. Secure children are fine, but place the root outside combat (`kit:ApplyAnchor` inside `kit.events.AfterCombat` when needed).
 - The yellow colors are estimates; the blue ones were measured on Forever build 70338.
 
+## Dispellable debuffs
+
+`ClaiibuAPI.Dispel.Get(unit, mode)` returns the first dispellable debuff on `unit`, or nil. If several are present, only the first (in the client's aura order) is returned.
+
+```lua
+local info = ClaiibuAPI.Dispel.Get("party1")
+if info then
+	ns.dispelIcon:SetTexture(info.icon)
+	ns.dispelName:SetText(info.name)
+	if info.color then
+		ns.dispelGlow:SetVertexColor(info.color.r, info.color.g, info.color.b, info.color.a)
+	end
+end
+
+ClaiibuAPI.Dispel.OnChange(function(unit)
+	ns.UpdateDispel(unit)   -- call Get(unit) again
+end)
+```
+
+| Mode | Returns |
+| --- | --- |
+| `"player"` (default) | The first debuff this player can dispel. The client picks it (`HARMFUL|RAID` filter), so it works even when aura fields are secret. |
+| `"any"` | The first debuff with any dispel type, whoever can dispel it. Debuffs whose type is secret are skipped. |
+
+| Field | Meaning |
+| --- | --- |
+| `name`, `icon`, `spellId` | The debuff |
+| `type` | "Magic", "Curse", "Disease", "Poison", "Bleed" ("" for enrage). Hexes report their spell's type (Hex is a Curse). |
+| `applications`, `duration`, `expirationTime`, `auraInstanceID` | As the client reports them |
+| `color` | `{ r, g, b, a }` (also `[1]`..`[4]`) for the type, or nil for a secret or uncolored type |
+| `secret` | `{ field = true }` for each field that is a secret value |
+| `anySecret` | true when any field is secret |
+
+Colors (`ClaiibuAPI.Dispel.COLORS`):
+
+| Type | RGBA | Hex |
+| --- | --- | --- |
+| Magic | 0.2, 0.5, 1, 0.85 | #3380FF |
+| Curse | 0.65, 0.2, 0.95, 0.85 | #A633F2 |
+| Poison | 0.2, 0.9, 0.2, 0.85 | #33E633 |
+| Disease | 0.6, 0.4, 0.0, 0.85 | #966400 |
+
+- **Safe in combat:** the tracker only reads aura data. It never calls protected functions, hooks Blizzard frames or touches secure attributes, so it can't taint anything.
+- **Secret values:** on Forever some aura fields can be secret in combat. Pass them straight to `SetText`/`SetTexture`; never compare, concatenate, `tostring` or print them. Check `info.secret.<field>` first.
+- **Caching:** results are cached per unit until that unit's `UNIT_AURA` or a change of units (roster, target, focus, mouseover, nameplates, pets, zoning, spec). Calling `Get` every frame is cheap.
+
 ## Profiles
 
 - Each profile is a string such as `PSK1:{s5:scalen1.5;s6:lockedT}` in the addon's account-wide saved variable. Only settings that differ from the defaults are written. Each character remembers its active profile in the per-character saved variable.
@@ -251,6 +299,7 @@ Nothing has been run in game yet. Run `/capi probe` on your build and check:
 
 - `Settings.RegisterCanvasLayoutCategory`/`Subcategory`. Without the Settings API, the pages open in a standalone window with the same list down the left.
 - `EventRegistry` "EditMode.Enter"/"EditMode.Exit" and `EditModeManagerFrame.SelectSystem`/`ClearSelectedSystem` (Edit Mode). The probe shows whether ClaiibuAPI is listening.
+- The dispel tracker: which aura fields are secret in combat, and whether `HARMFUL|RAID` still returns only debuffs this player can dispel. `/capi dispel <unit>` shows what it finds.
 - `BasicFrameTemplateWithInset` (the copy window's frame; a plain dialog frame is used without it).
 - `SettingsCheckboxTemplate`, `SettingsDropdownWithButtonsTemplate` (and its `Dropdown`, `DecrementButton`, `IncrementButton` children), `MinimalSliderWithSteppersTemplate`, `ScrollFrameTemplate`, `InputScrollFrameTemplate`.
 - The `OnDefault`/`OnRefresh` hooks that the settings panel calls on a canvas frame.

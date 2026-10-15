@@ -113,6 +113,8 @@ function C.ProbeRows(kit)
 		"EventRegistry (Edit Mode callbacks): " .. Has(EventRegistry and EventRegistry.RegisterCallback)
 			.. (SK.EditMode and SK.EditMode.listening and ", listening" or ""),
 		"EditModeManagerFrame (selection hooks): " .. Has(EditModeManagerFrame),
+		"C_UnitAuras.GetAuraDataByIndex (dispel tracker): " .. Has(C_UnitAuras and C_UnitAuras.GetAuraDataByIndex)
+			.. ", UnitDebuff: " .. Has(UnitDebuff),
 		"SOUNDKIT: " .. Has(SOUNDKIT),
 		"C_AddOns.GetAddOnMetadata: " .. Has(C_AddOns and C_AddOns.GetAddOnMetadata),
 		"LibSharedMedia-3.0: " .. (SK.Media.LSM() and "loaded" or "not loaded (optional)"),

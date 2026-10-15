@@ -75,6 +75,22 @@ API.EditMode = {
 	IsActive = SK.EditMode.IsActive, -- true while Blizzard's Edit Mode is open
 }
 
+-- Dispellable debuffs, safe in combat (reads auras only; secret fields are
+-- passed through and flagged, never compared).
+--   Get(unit, mode)  -> first dispellable debuff or nil; mode "player" (default) or "any"
+--   Has(unit, mode)  -> boolean
+--   ColorFor(type)   -> { r, g, b, a } or nil
+--   OnChange(fn)     -> fn(unit) after a unit's auras change
+API.Dispel = {
+	Get = SK.Dispel.Get,
+	Has = SK.Dispel.Has,
+	ColorFor = SK.Dispel.ColorFor,
+	OnChange = SK.Dispel.OnChange,
+	IsSupported = SK.Dispel.IsSupported,
+	TYPES = SK.Dispel.TYPES,
+	COLORS = SK.Dispel.COLORS,
+}
+
 -- An event frame with a handler table, AfterCombat and Defer, for an addon
 -- that wants one without a settings window. kit.events is one of these.
 API.NewEvents = SK.NewEvents

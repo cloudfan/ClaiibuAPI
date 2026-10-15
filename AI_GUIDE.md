@@ -8,7 +8,7 @@ This file is kept in step with the API. Every feature lists the version that add
 
 =====
 
-You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.4.0, API level 1. Repository: `cloudfan/ClaiibuAPI`.
+You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.5.0, API level 1. Repository: `cloudfan/ClaiibuAPI`.
 
 ## How to answer
 
@@ -304,6 +304,33 @@ local real = kit:GetSaved("showSolo")   -- the saved value, ignoring temporary o
 - Settings pages show and change the saved value. Changing a setting that has a temporary value changes the saved value only; the temporary one stays until cleared.
 - Profile switches, imports, Defaults and Save keep temporary values out of the saved strings and put them back on top afterwards.
 - The reload prompt (F20) compares saved values, so a temporary value never asks for a reload.
+
+### F23. Dispellable debuff tracker (since 1.5.0)
+
+`ClaiibuAPI.Dispel.Get(unit)` returns the first dispellable debuff on a unit, or nil. It is safe in combat: it only reads aura data (`C_UnitAuras.GetAuraDataByIndex`, or `UnitDebuff` on clients that still have it). It never calls a protected function, hooks a Blizzard frame or touches a secure attribute, so it cannot taint anything.
+
+```lua
+local info = ClaiibuAPI.Dispel.Get("party1")          -- debuffs this player can dispel
+if info then
+	icon:SetTexture(info.icon)                       -- fine even if secret
+	nameText:SetText(info.name)                      -- fine even if secret
+	if info.color then                               -- nil when the type is secret or has no color
+		glow:SetVertexColor(info.color.r, info.color.g, info.color.b, info.color.a)
+	end
+end
+local anyone = ClaiibuAPI.Dispel.Get("party1", "any") -- any dispel type, not just the player's
+ClaiibuAPI.Dispel.OnChange(function(unit) ns.UpdateDispelGlow(unit) end)
+```
+
+- Result fields: `name`, `type` ("Magic", "Curse", "Disease", "Poison", "Bleed"; "" for enrage effects on enemies), `icon`, `spellId`, `applications`, `duration`, `expirationTime`, `auraInstanceID`, `unit`, `color` (`{ r, g, b, a }`, also `[1]`..`[4]`), `secret` (`{ field = true }` for each secret field) and `anySecret`.
+- Only the first match is returned, in the client's aura order.
+- `"player"` mode (default) uses the client's `HARMFUL|RAID` filter, so the client decides what this player can dispel and nothing secret has to be read. `"any"` mode reads each debuff's type and skips types that are secret.
+- There is no separate "Hex" type: hexes and similar effects report their spell's type (Hex is a Curse).
+- Colors (`ClaiibuAPI.Dispel.COLORS`, `ColorFor(type)`): Magic 0.2, 0.5, 1 (#3380FF); Curse 0.65, 0.2, 0.95 (#A633F2); Poison 0.2, 0.9, 0.2 (#33E633); Disease 0.6, 0.4, 0.0 (#966400); all at alpha 0.85. Bleed and enrage have no color.
+- Results are cached per unit and mode until that unit's `UNIT_AURA`, or until units may have changed (roster, target, focus, mouseover, nameplates, pets, zoning, spec changes).
+- `OnChange(fn)` calls `fn(unit)` after each `UNIT_AURA`; call `Get` again there. `Has(unit, mode)` is `Get(...) ~= nil`. `IsSupported()` is false when the client has neither aura API.
+- Gotcha: fields in `info.secret` are secret values on Forever in combat. Pass them straight to `SetText`/`SetTexture`; never compare, concatenate, `tostring` or print them.
+- Unverified on Forever: which aura fields are secret in combat, and whether the `RAID` filter still means "dispellable by me" for harmful auras.
 
 ### Not yet verified on Forever
 

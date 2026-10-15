@@ -2,7 +2,7 @@
 ## Title: ClaiibuAPI
 ## Notes: Shared settings framework for Maiibu's addons: settings pages, media lists, profiles. Other addons depend on it.
 ## Author: cloudfan
-## Version: 1.4.0
+## Version: 1.5.0
 ## OptionalDeps: LibSharedMedia-3.0
 
 Events.lua
@@ -12,6 +12,7 @@ Media.lua
 Widgets.lua
 CopyWindow.lua
 EditMode.lua
+Dispel.lua
 Profiles.lua
 Settings.lua
 API.lua

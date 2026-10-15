@@ -2,6 +2,22 @@
 
 Each entry is a prompt for an AI assistant. Paste the prompt, then the addon's `.toc` and `.lua` files under it. Newest first.
 
+## 1.5.0: dispellable debuff tracker
+
+```
+Update this World of Warcraft: Forever addon (Lua 5.1, ## Interface: 16001) to use ClaiibuAPI 1.5.0's dispellable debuff tracker.
+
+1. Find the addon's own dispellable-debuff code: loops over C_UnitAuras.GetAuraDataByIndex, C_UnitAuras.GetAuraDataBySlot, AuraUtil.ForEachAura, UnitDebuff or UnitAura looking at dispelName/debuffType; its own dispel-type color tables; and its own UNIT_AURA handling done only for that purpose.
+2. Replace the lookup with: local info = ClaiibuAPI.Dispel.Get(unit) (or ClaiibuAPI.Dispel.Get(unit, "any") where the addon wants every dispellable debuff, not just the ones this player can dispel). It returns the first dispellable debuff or nil, with name, type, icon, spellId, applications, duration, expirationTime, auraInstanceID, color ({ r, g, b, a }), secret ({ field = true }) and anySecret.
+3. Use info.color for dispel-type colors and remove the addon's own color table for them. info.color is nil when the type is secret or has no color: keep the display's normal look then.
+4. Refresh from ClaiibuAPI.Dispel.OnChange(function(unit) ... end) instead of the addon's own UNIT_AURA handler, if that handler only served dispel tracking. Keep UNIT_AURA handling that does other work.
+5. Fields listed in info.secret are secret values: pass them straight to SetText/SetTexture; never compare, concatenate, tostring or print them.
+6. Guard every use with if ClaiibuAPI.Dispel then ... end and keep the old code path in the else branch, so the addon still works on ClaiibuAPI older than 1.5.0. Keep ClaiibuAPI.Require(1, addonName). Add "Requires ClaiibuAPI 1.5.0 or newer for the dispel tracker" to the README or notes.
+7. Do not change anything else. No new globals, no new event frames.
+
+Output every changed file in full (no fragments, no "rest unchanged"), then list what you replaced.
+```
+
 ## 1.4.0: Edit Mode support, temporary values, 60-second reload cooldown
 
 ```
