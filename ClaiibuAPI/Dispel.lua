@@ -139,10 +139,23 @@ function Dispel.Get(unit, mode)
 	if byMode and byMode[mode] ~= nil then
 		return byMode[mode] or nil
 	end
-	local result = Scan(unit, mode)
+	-- Reading auras is not protected, but on Forever a secret value can make
+	-- the read fail in combat. That must never become an error in the
+	-- calling addon: the failure is kept for /claiibu dispel raw and nil is
+	-- returned (not cached, so the next call tries again).
+	local ok, result = pcall(Scan, unit, mode)
+	if not ok then
+		Dispel.lastError = { unit = unit, mode = mode, message = tostring(result) }
+		return nil
+	end
 	cache[unit] = byMode or {}
 	cache[unit][mode] = result or false
 	return result
+end
+
+-- The last read that failed, as { unit, mode, message }, or nil.
+function Dispel.LastError()
+	return Dispel.lastError
 end
 
 -- True when the unit has a dispellable debuff (same modes as Get).
@@ -252,19 +265,86 @@ local function Show(value)
 	return tostring(value)
 end
 
+-- Text that is safe in a copy window: "|" starts escape codes there.
+local function Clean(text)
+	text = tostring(text):gsub("|", "/"):gsub("Interface[/\\]AddOns[/\\]", "")
+	return text
+end
+
+local function Label(filter)
+	return (filter:gsub("|", "+"))
+end
+
+-- Errors carry the step that failed, to tell "the client refused" from
+-- "a secret value broke our own code".
+local stage = "start"
+
+local function Describe(aura)
+	stage = "type check"
+	if C.IsSecret(aura) then
+		return "(whole aura secret)"
+	end
+	stage = "read name"
+	local name = aura.name
+	stage = "read dispelName"
+	local dispelType = aura.dispelName
+	stage = "read spellId"
+	local spellId = aura.spellId
+	stage = "format"
+	return Show(name) .. " [type " .. Show(dispelType) .. ", spell " .. Show(spellId) .. "]"
+end
+
 local function CountFilter(unit, filter)
 	local count, shown = 0, {}
 	for i = 1, MAX_AURAS do
-		local found, name, _, _, dispelType, _, _, spellId = ReadAura(unit, i, filter)
-		if not found then
+		stage = "GetAuraDataByIndex"
+		local aura
+		if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
+			aura = C_UnitAuras.GetAuraDataByIndex(unit, i, filter)
+		else
+			stage = "UnitDebuff"
+			local name = UnitDebuff and UnitDebuff(unit, i, filter)
+			aura = name and { name = name } or nil
+		end
+		stage = "nil check"
+		if not C.IsSecret(aura) and aura == nil then
 			break
 		end
 		count = count + 1
 		if i <= RAW_SHOWN then
-			shown[#shown + 1] = Show(name) .. " [type " .. Show(dispelType) .. ", spell " .. Show(spellId) .. "]"
+			shown[#shown + 1] = Describe(aura)
 		end
 	end
 	return count, shown
+end
+
+-- The other ways the client offers to read auras, for comparison.
+local function CountSlots(unit, filter)
+	stage = "GetAuraSlots"
+	local results = { C_UnitAuras.GetAuraSlots(unit, filter) }
+	local count, shown = 0, {}
+	for i = 2, #results do
+		stage = "GetAuraDataBySlot"
+		local aura = C_UnitAuras.GetAuraDataBySlot(unit, results[i])
+		count = count + 1
+		if count <= RAW_SHOWN and (C.IsSecret(aura) or aura ~= nil) then
+			shown[#shown + 1] = Describe(aura)
+		end
+	end
+	return count, shown
+end
+
+local function CountUnitAuras(unit, filter)
+	stage = "GetUnitAuras"
+	local list = C_UnitAuras.GetUnitAuras(unit, filter)
+	if C.IsSecret(list) then
+		return "(secret list)", {}
+	end
+	local shown = {}
+	for i = 1, math.min(#list, RAW_SHOWN) do
+		shown[i] = Describe(list[i])
+	end
+	return #list, shown
 end
 
 -- Blizzard's own indicators: the dispellable-debuff icons on Blizzard's
@@ -310,7 +390,20 @@ local function DescribeBlizzardFrame(frame, unit)
 		.. Show(frame.GetAlpha and frame:GetAlpha()) .. "): "
 	local icons = frame.dispelDebuffFrames
 	if type(icons) ~= "table" then
-		return line .. "no dispelDebuffFrames"
+		-- List the fields that look related, to find where this build keeps them.
+		local found = {}
+		for key, value in pairs(frame) do
+			if type(key) == "string" and (key:lower():find("dispel") or key:lower():find("debuff")
+				or key:lower():find("aura") or key:lower():find("buff")) then
+				local kind = C.IsSecret(value) and "secret" or type(value)
+				if kind == "table" and not C.IsSecret(value) then
+					kind = "table #" .. #value
+				end
+				found[#found + 1] = key .. " (" .. kind .. ")"
+			end
+		end
+		table.sort(found)
+		return line .. "no dispelDebuffFrames; related fields: " .. (#found > 0 and table.concat(found, ", ") or "none")
 	end
 	local parts = {}
 	for i, icon in ipairs(icons) do
@@ -371,14 +464,39 @@ function Dispel.Raw(units)
 			-- auras is not protected.
 			local ok, count, shown = pcall(CountFilter, unit, filter)
 			if not ok then
-				lines[#lines + 1] = unit .. " " .. filter .. ": error"
+				lines[#lines + 1] = unit .. " " .. Label(filter) .. ": error at " .. stage .. ": " .. Clean(count)
 			else
-				local line = unit .. " " .. filter .. ": " .. count
+				local line = unit .. " " .. Label(filter) .. ": " .. count
 				if count > 0 then
 					line = line .. " - " .. table.concat(shown, "; ")
 				end
 				lines[#lines + 1] = line
 			end
+		end
+		local others = {
+			{ "slots", C_UnitAuras and C_UnitAuras.GetAuraSlots and C_UnitAuras.GetAuraDataBySlot and CountSlots },
+			{ "GetUnitAuras", C_UnitAuras and C_UnitAuras.GetUnitAuras and CountUnitAuras },
+		}
+		for _, other in ipairs(others) do
+			local name, fn = other[1], other[2]
+			if not fn then
+				lines[#lines + 1] = unit .. " HARMFUL via " .. name .. ": not available"
+			else
+				local ok, count, shown = pcall(fn, unit, "HARMFUL")
+				if not ok then
+					lines[#lines + 1] = unit .. " HARMFUL via " .. name .. ": error at " .. stage .. ": " .. Clean(count)
+				else
+					local line = unit .. " HARMFUL via " .. name .. ": " .. tostring(count)
+					if #shown > 0 then
+						line = line .. " - " .. table.concat(shown, "; ")
+					end
+					lines[#lines + 1] = line
+				end
+			end
+		end
+		local failed = Dispel.lastError
+		if failed and failed.unit == unit then
+			lines[#lines + 1] = unit .. " last Dispel.Get error (" .. failed.mode .. "): " .. Clean(failed.message)
 		end
 		for _, line in ipairs(Dispel.BlizzardRaw({ unit })) do
 			lines[#lines + 1] = line

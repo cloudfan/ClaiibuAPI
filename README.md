@@ -39,7 +39,7 @@ ClaiibuAPI's own commands (work without the demo):
 | --- | --- |
 | `/claiibu dispel [unit]` | The first dispellable debuff on `unit`, or on you, your target and your party, in a copy window. Says whether you are in combat; secret fields show as "(secret)" |
 | `/claiibu dispel watch` | Records dispellable debuffs during your next fights (commands can't be typed in combat) and opens the results when combat ends. Run it again to stop |
-| `/claiibu dispel raw [unit]` | Raw aura data: how many debuffs the client returns for `HARMFUL`, `HARMFUL\|RAID` and `HARMFUL\|RAID_PLAYER_DISPELLABLE`, and the first three (name, type, spell, or "(secret)"). Also what Blizzard's own party/raid frames show: their dispel icons (shown, texture, aura ID and the aura behind it). Shows why the tracker finds nothing |
+| `/claiibu dispel raw [unit]` | Raw aura data: how many debuffs the client returns for `HARMFUL`, `HARMFUL\|RAID` and `HARMFUL\|RAID_PLAYER_DISPELLABLE`, and the first three (name, type, spell, or "(secret)"). Error messages show where a read failed. Also tries `GetAuraSlots`/`GetAuraDataBySlot` and `GetUnitAuras`. Also what Blizzard's own party/raid frames show (or, when they have no `dispelDebuffFrames`, which related fields they do have): their dispel icons (shown, texture, aura ID and the aura behind it). Shows why the tracker finds nothing |
 | `/claiibu dispel watch raw` | Records the raw aura data during your next fights instead |
 | `/claiibu probe` | Which APIs and templates this client has, and which ones ClaiibuAPI is using, in a copy window |
 | `/claiibu version` | The installed ClaiibuAPI version and API level |
@@ -154,6 +154,7 @@ Add `reload = true` to any control with a `key` whose change can taint the UI un
 | `Serializer.Encode`, `Serializer.Decode` | The profile string format, for other data |
 | `Compat.IsSecret`, `Compat.TemplateExists`, `Compat.AtlasExists`, `Compat.ProbeRows` | Capability checks |
 | `EditMode.New(addonName, spec)`, `EditMode.IsActive()` | Edit Mode movers without a kit (needs `getPosition`/`savePosition`); whether Blizzard's Edit Mode is open |
+| `Dispel.LastError()` | `{ unit, mode, message }` of the last aura read that failed (Get returns nil then, it never throws), or nil |
 | `Dispel.Report(units)` | Plain-text lines describing units' dispellable debuffs (secret fields as "(secret)"), for a copy window or a debug command |
 | `Dispel.Get(unit, mode)`, `Dispel.Has`, `Dispel.ColorFor(type)`, `Dispel.COLORS`, `Dispel.OnChange(fn)`, `Dispel.IsSupported()` | The dispellable debuff tracker; see [Dispellable debuffs](#dispellable-debuffs) |
 | `NewEvents()` | An event frame with a handler table, for an addon without a settings window |

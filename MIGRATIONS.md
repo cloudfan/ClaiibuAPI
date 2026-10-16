@@ -2,6 +2,20 @@
 
 Each entry is a prompt for an AI assistant. Paste the prompt, then the addon's `.toc` and `.lua` files under it. Newest first.
 
+## 1.5.4: Dispel.Get never throws; Dispel.LastError
+
+```
+Update this World of Warcraft: Forever addon (Lua 5.1, ## Interface: 16001) for ClaiibuAPI 1.5.4.
+
+What changed: ClaiibuAPI.Dispel.Get no longer raises a Lua error when the client fails an aura read in combat; it returns nil, and ClaiibuAPI.Dispel.LastError() returns { unit, mode, message } for the last failure.
+
+1. Find pcall wrappers the addon put around ClaiibuAPI.Dispel.Get only to survive such errors, and remove them (keep the call itself).
+2. If the addon has a debug or diagnostic command, it may add the message from ClaiibuAPI.Dispel.LastError() to its output, guarded with if ClaiibuAPI.Dispel.LastError then. Show it with ns.kit:ShowCopy, never in a loop of print calls.
+3. Keep ClaiibuAPI.Require(1, addonName). Do not change anything else.
+
+Output every changed file in full (no fragments, no "rest unchanged"). If nothing needed to change, say so and output no files.
+```
+
 ## 1.5.1: /claiibu commands and Dispel.Report
 
 ```

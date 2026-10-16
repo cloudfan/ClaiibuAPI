@@ -86,6 +86,7 @@ API.Dispel = {
 	Has = SK.Dispel.Has,
 	ColorFor = SK.Dispel.ColorFor,
 	OnChange = SK.Dispel.OnChange,
+	LastError = SK.Dispel.LastError, -- LastError() -> { unit, mode, message } of the last failed read, or nil
 	IsSupported = SK.Dispel.IsSupported,
 	Report = SK.Dispel.Report,       -- Report(units) -> lines of plain text, secret fields as "(secret)"
 	TYPES = SK.Dispel.TYPES,
