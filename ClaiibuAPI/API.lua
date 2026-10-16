@@ -112,13 +112,37 @@ ClaiibuAPI = API
 -- /claiibu: diagnostics that work without the demo addon.
 local commands = {}
 
+local function Show(value)
+	if value == nil then
+		return "nil"
+	end
+	if C.IsSecret(value) then
+		return "(secret)"
+	end
+	return tostring(value)
+end
+
 commands.dispel = function(unit)
-	if unit == "watch" then
-		if SK.Dispel.ToggleWatch() then
-			print("|cffe0b060ClaiibuAPI|r Dispel recorder on: start a fight; the results open when combat ends.")
+	if unit == "watch" or unit == "watch raw" then
+		local raw = unit == "watch raw"
+		if SK.Dispel.ToggleWatch(raw) then
+			print("|cffe0b060ClaiibuAPI|r Dispel recorder on" .. (raw and " (raw)" or "")
+				.. ": start a fight; the results open when combat ends.")
 		else
 			print("|cffe0b060ClaiibuAPI|r Dispel recorder off.")
 		end
+		return
+	end
+	if unit == "raw" or unit:find("^raw ") then
+		local target = strtrim(unit:sub(4))
+		local units = target ~= "" and { target } or { "player", "target", "party1", "party2", "party3", "party4" }
+		local _, class = UnitClass("player")
+		local lines = { "Your class: " .. Show(class) .. ". In combat: " .. ((InCombatLockdown and InCombatLockdown()) and "yes" or "no"),
+			"Counts per filter, then up to 3 debuffs: name [type, spell].", "" }
+		for _, line in ipairs(SK.Dispel.Raw(units)) do
+			lines[#lines + 1] = line
+		end
+		SK.CopyWindow.Show("ClaiibuAPI: Raw Aura Data", lines)
 		return
 	end
 	local units = unit ~= "" and { unit } or { "player", "target", "party1", "party2", "party3", "party4" }
@@ -134,7 +158,7 @@ commands.version = function()
 end
 
 commands.help = function()
-	print("|cffe0b060ClaiibuAPI|r /claiibu dispel [unit] - dispellable debuffs, /claiibu dispel watch - record them in your next fights, /claiibu probe - API check, /claiibu version")
+	print("|cffe0b060ClaiibuAPI|r /claiibu dispel [unit] - dispellable debuffs, /claiibu dispel watch [raw] - record them in your next fights, /claiibu dispel raw [unit] - raw aura data, /claiibu probe - API check, /claiibu version")
 end
 
 SLASH_CLAIIBUAPI1 = "/claiibu"

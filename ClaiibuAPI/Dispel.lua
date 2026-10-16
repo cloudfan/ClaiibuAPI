@@ -84,6 +84,10 @@ end
 local function ReadAura(unit, i, filter)
 	if C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
 		local aura = C_UnitAuras.GetAuraDataByIndex(unit, i, filter)
+		-- A whole aura table could be secret; never test or index it then.
+		if C.IsSecret(aura) then
+			return true, "(secret aura)"
+		end
 		if not aura then
 			return nil
 		end
@@ -232,12 +236,70 @@ local function Now()
 	return GetTime and GetTime() or 0
 end
 
+-- Raw view: what the client returns for each filter, so a "none" can be
+-- traced to its cause (no debuffs at all, a filter that changed, secret
+-- fields). unit names and fields are shown as "(secret)" when secret.
+local RAW_FILTERS = { "HARMFUL", "HARMFUL|RAID", "HARMFUL|RAID_PLAYER_DISPELLABLE" }
+local RAW_SHOWN = 3
+
+local function Show(value)
+	if value == nil then
+		return "nil"
+	end
+	if C.IsSecret(value) then
+		return "(secret)"
+	end
+	return tostring(value)
+end
+
+local function CountFilter(unit, filter)
+	local count, shown = 0, {}
+	for i = 1, MAX_AURAS do
+		local found, name, _, _, dispelType, _, _, spellId = ReadAura(unit, i, filter)
+		if not found then
+			break
+		end
+		count = count + 1
+		if i <= RAW_SHOWN then
+			shown[#shown + 1] = Show(name) .. " [type " .. Show(dispelType) .. ", spell " .. Show(spellId) .. "]"
+		end
+	end
+	return count, shown
+end
+
+function Dispel.Raw(units)
+	local lines = {}
+	for _, unit in ipairs(units) do
+		for _, filter in ipairs(RAW_FILTERS) do
+			-- pcall only guards against a filter this client rejects; reading
+			-- auras is not protected.
+			local ok, count, shown = pcall(CountFilter, unit, filter)
+			if not ok then
+				lines[#lines + 1] = unit .. " " .. filter .. ": error"
+			else
+				local line = unit .. " " .. filter .. ": " .. count
+				if count > 0 then
+					line = line .. " - " .. table.concat(shown, "; ")
+				end
+				lines[#lines + 1] = line
+			end
+		end
+	end
+	return lines
+end
+
 local function Record(unit)
 	if not (recorder.on and recorder.inCombat) then
 		return
 	end
-	local lines = Dispel.Report({ unit })
-	-- lines[1] is the "In combat" line; the rest describe the unit.
+	local lines
+	if recorder.raw then
+		lines = Dispel.Raw({ unit })
+		table.insert(lines, 1, "")
+	else
+		lines = Dispel.Report({ unit })
+	end
+	-- lines[1] is the "In combat" line (or a blank); the rest describe the unit.
 	for i = 2, #lines do
 		local line = lines[i]
 		if not recorder.seen[line] and #recorder.lines < MAX_RECORDED then
@@ -291,13 +353,20 @@ SK.Events.On("PLAYER_REGEN_ENABLED", function()
 		end
 	end
 	lines[#lines + 1] = ""
-	lines[#lines + 1] = "Still recording the next combat. /claiibu dispel watch turns it off."
+	lines[#lines + 1] = "Still recording the next combat" .. (recorder.raw and " (raw)" or "")
+		.. ". /claiibu dispel watch turns it off."
 	SK.CopyWindow.Show("ClaiibuAPI: Dispellable Debuffs in Combat", lines)
 end)
 
--- Turns the recorder on or off; returns the new state.
-function Dispel.ToggleWatch()
+-- Turns the recorder on or off; returns the new state. raw records
+-- Dispel.Raw instead of Dispel.Report.
+function Dispel.ToggleWatch(raw)
+	if recorder.on and raw and not recorder.raw then
+		recorder.raw = true -- switch an active recorder to raw
+		return true
+	end
 	recorder.on = not recorder.on
+	recorder.raw = raw and true or false
 	recorder.inCombat = false
 	return recorder.on
 end

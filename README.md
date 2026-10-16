@@ -39,6 +39,8 @@ ClaiibuAPI's own commands (work without the demo):
 | --- | --- |
 | `/claiibu dispel [unit]` | The first dispellable debuff on `unit`, or on you, your target and your party, in a copy window. Says whether you are in combat; secret fields show as "(secret)" |
 | `/claiibu dispel watch` | Records dispellable debuffs during your next fights (commands can't be typed in combat) and opens the results when combat ends. Run it again to stop |
+| `/claiibu dispel raw [unit]` | Raw aura data: how many debuffs the client returns for `HARMFUL`, `HARMFUL\|RAID` and `HARMFUL\|RAID_PLAYER_DISPELLABLE`, and the first three (name, type, spell, or "(secret)"). Shows why the tracker finds nothing |
+| `/claiibu dispel watch raw` | Records the raw aura data during your next fights instead |
 | `/claiibu probe` | Which APIs and templates this client has, and which ones ClaiibuAPI is using, in a copy window |
 | `/claiibu version` | The installed ClaiibuAPI version and API level |
 
