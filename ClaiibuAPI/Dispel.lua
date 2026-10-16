@@ -267,6 +267,102 @@ local function CountFilter(unit, filter)
 	return count, shown
 end
 
+-- Blizzard's own indicators: the dispellable-debuff icons on Blizzard's
+-- party and raid frames. Read only: these frames are looked up by their
+-- global names and inspected, never called, hooked or changed. Their field
+-- names (dispelDebuffFrames, icon, auraInstanceID) come from Mainline and
+-- are unconfirmed on Forever, so each is checked before use.
+
+local function BlizzardFrames()
+	local frames = {}
+	local function Add(name)
+		local frame = _G[name]
+		if type(frame) == "table" and frame.GetObjectType then
+			frames[#frames + 1] = frame
+		end
+	end
+	for i = 1, 5 do
+		Add("CompactPartyFrameMember" .. i)
+	end
+	for i = 1, 40 do
+		Add("CompactRaidFrame" .. i)
+	end
+	for group = 1, 8 do
+		for member = 1, 5 do
+			Add("CompactRaidGroup" .. group .. "Member" .. member)
+		end
+	end
+	return frames
+end
+
+local function FrameUnit(frame)
+	local unit = frame.displayedUnit or frame.unit
+	if type(unit) ~= "string" or C.IsSecret(unit) then
+		return nil
+	end
+	return unit
+end
+
+-- One line describing a Blizzard frame's dispel icons.
+local function DescribeBlizzardFrame(frame, unit)
+	local name = frame.GetName and frame:GetName() or "?"
+	local line = name .. " (" .. unit .. ", shown " .. Show(frame:IsShown()) .. ", alpha "
+		.. Show(frame.GetAlpha and frame:GetAlpha()) .. "): "
+	local icons = frame.dispelDebuffFrames
+	if type(icons) ~= "table" then
+		return line .. "no dispelDebuffFrames"
+	end
+	local parts = {}
+	for i, icon in ipairs(icons) do
+		local shown = icon.IsShown and icon:IsShown()
+		if C.IsSecret(shown) or shown then
+			local texture = icon.icon and icon.icon.GetTexture and icon.icon:GetTexture()
+			local id = icon.auraInstanceID
+			local part = "#" .. i .. " shown " .. Show(shown) .. ", texture " .. Show(texture) .. ", auraInstanceID " .. Show(id)
+			if Readable(id) and C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID then
+				local aura = C_UnitAuras.GetAuraDataByAuraInstanceID(unit, id)
+				if C.IsSecret(aura) then
+					part = part .. ", aura (secret)"
+				elseif aura then
+					part = part .. ", aura " .. Show(aura.name) .. " [type " .. Show(aura.dispelName) .. "]"
+				end
+			end
+			parts[#parts + 1] = part
+		end
+	end
+	if #parts == 0 then
+		return line .. #icons .. " dispel icons, none shown"
+	end
+	return line .. table.concat(parts, "; ")
+end
+
+function Dispel.BlizzardRaw(units)
+	local lines = {}
+	local wanted
+	if units then
+		wanted = {}
+		for _, unit in ipairs(units) do
+			wanted[unit] = true
+		end
+	end
+	local frames = BlizzardFrames()
+	local matched = 0
+	for _, frame in ipairs(frames) do
+		local unit = FrameUnit(frame)
+		if unit and (not wanted or wanted[unit]) then
+			matched = matched + 1
+			-- pcall only guards against frame internals that differ on this build.
+			local ok, line = pcall(DescribeBlizzardFrame, frame, unit)
+			lines[#lines + 1] = "Blizzard " .. (ok and line or ((frame.GetName and frame:GetName() or "?") .. ": could not be read"))
+		end
+	end
+	if matched == 0 then
+		lines[#lines + 1] = "Blizzard frames: none for " .. (units and table.concat(units, ", ") or "any unit")
+			.. " (" .. #frames .. " Blizzard party/raid frames exist)"
+	end
+	return lines
+end
+
 function Dispel.Raw(units)
 	local lines = {}
 	for _, unit in ipairs(units) do
@@ -283,6 +379,9 @@ function Dispel.Raw(units)
 				end
 				lines[#lines + 1] = line
 			end
+		end
+		for _, line in ipairs(Dispel.BlizzardRaw({ unit })) do
+			lines[#lines + 1] = line
 		end
 	end
 	return lines
