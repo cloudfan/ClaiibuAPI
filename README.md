@@ -265,8 +265,11 @@ end)
 
 | Mode | Returns |
 | --- | --- |
-| `"player"` (default) | The first debuff this player can dispel. The client picks it (`HARMFUL|RAID` filter), so it works even when aura fields are secret. |
-| `"any"` | The first debuff with any dispel type, whoever can dispel it. Debuffs whose type is secret are skipped. |
+| `"player"` (default) | The first debuff this player can dispel (`HARMFUL\|RAID` filter). |
+| `"group"` | The first debuff someone in your group can dispel (`HARMFUL\|RAID_PLAYER_DISPELLABLE`). Since 1.5.4. |
+| `"any"` | The first dispellable debuff, whoever can dispel it (`HARMFUL\|DISPELLABLE`; since 1.5.4, before that it read each debuff's type). |
+
+The client picks the debuff in every mode, so this works even when aura fields are secret. In `"group"` and `"any"`, a debuff whose readable type is "" is skipped, in case a client ignores the filter.
 
 | Field | Meaning |
 | --- | --- |

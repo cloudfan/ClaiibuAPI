@@ -77,7 +77,7 @@ API.EditMode = {
 
 -- Dispellable debuffs, safe in combat (reads auras only; secret fields are
 -- passed through and flagged, never compared).
---   Get(unit, mode)  -> first dispellable debuff or nil; mode "player" (default) or "any"
+--   Get(unit, mode)  -> first dispellable debuff or nil; mode "player" (default), "group" or "any"
 --   Has(unit, mode)  -> boolean
 --   ColorFor(type)   -> { r, g, b, a } or nil
 --   OnChange(fn)     -> fn(unit) after a unit's auras change

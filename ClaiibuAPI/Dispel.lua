@@ -10,18 +10,24 @@ local addonName, ns = ...
 -- branched on: they are passed through as they are (FontString:SetText and
 -- Texture:SetTexture accept them) and the result says which ones are secret.
 --
--- "player" mode (the default) asks the client for the debuffs this player
--- can dispel (the HARMFUL|RAID filter), so the client decides and nothing
--- secret has to be read to find them. "any" mode returns the first debuff
--- with any dispel type; it has to read the type, so it skips debuffs whose
--- type is secret.
+-- Every mode lets the client choose with an aura filter, so nothing secret
+-- has to be read to find a match:
+--   "player" (default)  HARMFUL|RAID                     this player can dispel
+--   "group"             HARMFUL|RAID_PLAYER_DISPELLABLE  someone in the group can dispel
+--   "any"               HARMFUL|DISPELLABLE              dispellable by anyone
+-- In "group" and "any", a debuff whose readable type is "" (not dispellable)
+-- is skipped, in case a client ignores a filter token it doesn't know.
 local SK = ns.SettingsKit
 local C = SK.Compat
 local Dispel = {}
 SK.Dispel = Dispel
 
 local MAX_AURAS = 40
-local FILTER = { player = "HARMFUL|RAID", any = "HARMFUL" }
+local FILTER = {
+	player = "HARMFUL|RAID",
+	group = "HARMFUL|RAID_PLAYER_DISPELLABLE",
+	any = "HARMFUL|DISPELLABLE",
+}
 
 -- Dispel types as the client names them. Hexes and similar effects are not
 -- a type of their own: each reports the type of its spell (Hex is a Curse).
@@ -50,10 +56,6 @@ function Dispel.ColorFor(dispelType)
 		return nil
 	end
 	return Dispel.COLORS[dispelType]
-end
-
-local function HasType(dispelType)
-	return Readable(dispelType) and dispelType ~= ""
 end
 
 local function Result(unit, name, icon, count, dispelType, duration, expirationTime, spellId, auraInstanceID)
@@ -112,8 +114,9 @@ local function Scan(unit, mode)
 		if not found then
 			return nil
 		end
-		-- In "player" mode the filter already chose dispellable debuffs.
-		if mode ~= "any" or HasType(dispelType) then
+		-- The filter chose dispellable debuffs; a readable "" type means the
+		-- client ignored the token, so that debuff is skipped.
+		if mode == "player" or not Readable(dispelType) or dispelType ~= "" then
 			return Result(unit, name, icon, count, dispelType, duration, expirationTime, spellId, auraInstanceID)
 		end
 	end
@@ -125,7 +128,8 @@ end
 local cache = {}
 
 -- The first dispellable debuff on unit, or nil.
--- mode: "player" (default; debuffs this player can dispel) or "any".
+-- mode: "player" (default; debuffs this player can dispel), "group"
+-- (someone in the group can dispel) or "any" (dispellable by anyone).
 -- Returns { name, type, icon, spellId, applications, duration,
 -- expirationTime, auraInstanceID, color, secret = { field = true },
 -- anySecret }. Fields listed in secret are secret values: show them
@@ -134,7 +138,9 @@ function Dispel.Get(unit, mode)
 	if type(unit) ~= "string" then
 		return nil
 	end
-	mode = mode == "any" and "any" or "player"
+	if mode ~= "any" and mode ~= "group" then
+		mode = "player"
+	end
 	local byMode = cache[unit]
 	if byMode and byMode[mode] ~= nil then
 		return byMode[mode] or nil
@@ -252,7 +258,8 @@ end
 -- Raw view: what the client returns for each filter, so a "none" can be
 -- traced to its cause (no debuffs at all, a filter that changed, secret
 -- fields). unit names and fields are shown as "(secret)" when secret.
-local RAW_FILTERS = { "HARMFUL", "HARMFUL|RAID", "HARMFUL|RAID_PLAYER_DISPELLABLE" }
+local RAW_FILTERS = { "HARMFUL", "HARMFUL|RAID", "HARMFUL|RAID_PLAYER_DISPELLABLE", "HARMFUL|DISPELLABLE",
+	"HARMFUL|RAID_IN_COMBAT" }
 local RAW_SHOWN = 3
 
 local function Show(value)

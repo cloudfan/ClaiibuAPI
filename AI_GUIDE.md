@@ -318,13 +318,14 @@ if info then
 		glow:SetVertexColor(info.color.r, info.color.g, info.color.b, info.color.a)
 	end
 end
-local anyone = ClaiibuAPI.Dispel.Get("party1", "any") -- any dispel type, not just the player's
+local group = ClaiibuAPI.Dispel.Get("party1", "group") -- someone in the group can dispel it
+local anyone = ClaiibuAPI.Dispel.Get("party1", "any")  -- dispellable by anyone
 ClaiibuAPI.Dispel.OnChange(function(unit) ns.UpdateDispelGlow(unit) end)
 ```
 
 - Result fields: `name`, `type` ("Magic", "Curse", "Disease", "Poison", "Bleed"; "" for enrage effects on enemies), `icon`, `spellId`, `applications`, `duration`, `expirationTime`, `auraInstanceID`, `unit`, `color` (`{ r, g, b, a }`, also `[1]`..`[4]`), `secret` (`{ field = true }` for each secret field) and `anySecret`.
 - Only the first match is returned, in the client's aura order.
-- `"player"` mode (default) uses the client's `HARMFUL|RAID` filter, so the client decides what this player can dispel and nothing secret has to be read. `"any"` mode reads each debuff's type and skips types that are secret.
+- Modes, each a client aura filter so nothing secret has to be read: `"player"` (default) `HARMFUL|RAID`, debuffs this player can dispel; `"group"` (since 1.5.4) `HARMFUL|RAID_PLAYER_DISPELLABLE`, debuffs someone in the group can dispel; `"any"` `HARMFUL|DISPELLABLE`, dispellable by anyone (since 1.5.4; before, it read each type and skipped secret ones). In `"group"`/`"any"`, a debuff with a readable "" type is skipped in case a client ignores the filter.
 - There is no separate "Hex" type: hexes and similar effects report their spell's type (Hex is a Curse).
 - Colors (`ClaiibuAPI.Dispel.COLORS`, `ColorFor(type)`): Magic 0.2, 0.5, 1 (#3380FF); Curse 0.65, 0.2, 0.95 (#A633F2); Poison 0.2, 0.9, 0.2 (#33E633); Disease 0.6, 0.4, 0.0 (#966400); all at alpha 0.85. Bleed and enrage have no color.
 - Results are cached per unit and mode until that unit's `UNIT_AURA`, or until units may have changed (roster, target, focus, mouseover, nameplates, pets, zoning, spec changes).
