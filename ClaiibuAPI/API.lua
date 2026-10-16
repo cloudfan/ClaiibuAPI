@@ -113,6 +113,14 @@ ClaiibuAPI = API
 local commands = {}
 
 commands.dispel = function(unit)
+	if unit == "watch" then
+		if SK.Dispel.ToggleWatch() then
+			print("|cffe0b060ClaiibuAPI|r Dispel recorder on: start a fight; the results open when combat ends.")
+		else
+			print("|cffe0b060ClaiibuAPI|r Dispel recorder off.")
+		end
+		return
+	end
 	local units = unit ~= "" and { unit } or { "player", "target", "party1", "party2", "party3", "party4" }
 	SK.CopyWindow.Show("ClaiibuAPI: Dispellable Debuffs", SK.Dispel.Report(units))
 end
@@ -126,7 +134,7 @@ commands.version = function()
 end
 
 commands.help = function()
-	print("|cffe0b060ClaiibuAPI|r /claiibu dispel [unit] - dispellable debuffs, /claiibu probe - API check, /claiibu version")
+	print("|cffe0b060ClaiibuAPI|r /claiibu dispel [unit] - dispellable debuffs, /claiibu dispel watch - record them in your next fights, /claiibu probe - API check, /claiibu version")
 end
 
 SLASH_CLAIIBUAPI1 = "/claiibu"

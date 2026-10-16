@@ -217,3 +217,87 @@ for _, event in ipairs({ "GROUP_ROSTER_UPDATE", "PLAYER_TARGET_CHANGED", "PLAYER
 	"PLAYER_ENTERING_WORLD", "SPELLS_CHANGED" }) do
 	SK.Events.On(event, ClearAll)
 end
+
+-- Combat recorder ----------------------------------------------------------------
+-- Commands can't be typed in combat, so /claiibu dispel watch arms a
+-- recorder: in combat it notes what Report sees for the watched units
+-- whenever their auras change, and shows it all in the copy window when
+-- combat ends. Each different line is kept once, up to MAX_RECORDED.
+
+local WATCH_UNITS = { "player", "target", "party1", "party2", "party3", "party4" }
+local MAX_RECORDED = 60
+local recorder = { on = false }
+
+local function Now()
+	return GetTime and GetTime() or 0
+end
+
+local function Record(unit)
+	if not (recorder.on and recorder.inCombat) then
+		return
+	end
+	local lines = Dispel.Report({ unit })
+	-- lines[1] is the "In combat" line; the rest describe the unit.
+	for i = 2, #lines do
+		local line = lines[i]
+		if not recorder.seen[line] and #recorder.lines < MAX_RECORDED then
+			recorder.seen[line] = true
+			recorder.lines[#recorder.lines + 1] = format("[+%.1fs] %s", Now() - recorder.started, line)
+		end
+	end
+end
+
+local function WatchedUnit(unit)
+	for _, watched in ipairs(WATCH_UNITS) do
+		if unit == watched then
+			return true
+		end
+	end
+	return false
+end
+
+Dispel.OnChange(function(unit)
+	if WatchedUnit(unit) then
+		Record(unit)
+	end
+end)
+
+SK.Events.On("PLAYER_REGEN_DISABLED", function()
+	if not recorder.on then
+		return
+	end
+	recorder.inCombat, recorder.started = true, Now()
+	recorder.lines, recorder.seen = {}, {}
+	for _, unit in ipairs(WATCH_UNITS) do
+		Record(unit)
+	end
+end)
+
+SK.Events.On("PLAYER_REGEN_ENABLED", function()
+	if not (recorder.on and recorder.inCombat) then
+		return
+	end
+	recorder.inCombat = false
+	local lines = { format("Recorded in combat (%.0f seconds). Units: %s", Now() - recorder.started,
+		table.concat(WATCH_UNITS, ", ")) }
+	if #recorder.lines == 0 then
+		lines[2] = "No unit had a debuff the tracker could see."
+	else
+		for i = 1, #recorder.lines do
+			lines[#lines + 1] = recorder.lines[i]
+		end
+		if #recorder.lines >= MAX_RECORDED then
+			lines[#lines + 1] = "(stopped after " .. MAX_RECORDED .. " lines)"
+		end
+	end
+	lines[#lines + 1] = ""
+	lines[#lines + 1] = "Still recording the next combat. /claiibu dispel watch turns it off."
+	SK.CopyWindow.Show("ClaiibuAPI: Dispellable Debuffs in Combat", lines)
+end)
+
+-- Turns the recorder on or off; returns the new state.
+function Dispel.ToggleWatch()
+	recorder.on = not recorder.on
+	recorder.inCombat = false
+	return recorder.on
+end

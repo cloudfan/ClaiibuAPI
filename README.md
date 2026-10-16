@@ -38,6 +38,7 @@ ClaiibuAPI's own commands (work without the demo):
 | Command | What it does |
 | --- | --- |
 | `/claiibu dispel [unit]` | The first dispellable debuff on `unit`, or on you, your target and your party, in a copy window. Says whether you are in combat; secret fields show as "(secret)" |
+| `/claiibu dispel watch` | Records dispellable debuffs during your next fights (commands can't be typed in combat) and opens the results when combat ends. Run it again to stop |
 | `/claiibu probe` | Which APIs and templates this client has, and which ones ClaiibuAPI is using, in a copy window |
 | `/claiibu version` | The installed ClaiibuAPI version and API level |
 
