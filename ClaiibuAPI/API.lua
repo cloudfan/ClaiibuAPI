@@ -75,13 +75,15 @@ API.EditMode = {
 	IsActive = SK.EditMode.IsActive, -- true while Blizzard's Edit Mode is open
 }
 
--- Dispellable debuffs, safe in combat (reads auras only; secret fields are
--- passed through and flagged, never compared).
+-- Dispellable debuffs: DEPRECATED since 1.6.0. Forever refuses aura data to
+-- addons in combat, so this cannot work there; kept so existing callers
+-- don't break. Don't use it in new code.
 --   Get(unit, mode)  -> info or nil, status ("found", "none" or "blocked"); mode "player" (default), "group" or "any"
 --   Has(unit, mode)  -> boolean
 --   ColorFor(type)   -> { r, g, b, a } or nil
 --   OnChange(fn)     -> fn(unit) after a unit's auras change
 API.Dispel = {
+	DEPRECATED = true,
 	Get = SK.Dispel.Get,
 	Has = SK.Dispel.Has,
 	ColorFor = SK.Dispel.ColorFor,
@@ -114,41 +116,10 @@ ClaiibuAPI = API
 -- /claiibu: diagnostics that work without the demo addon.
 local commands = {}
 
-local function Show(value)
-	if value == nil then
-		return "nil"
-	end
-	if C.IsSecret(value) then
-		return "(secret)"
-	end
-	return tostring(value)
-end
 
-commands.dispel = function(unit)
-	if unit == "watch" or unit == "watch raw" then
-		local raw = unit == "watch raw"
-		if SK.Dispel.ToggleWatch(raw) then
-			print("|cffe0b060ClaiibuAPI|r Dispel recorder on" .. (raw and " (raw)" or "")
-				.. ": start a fight; the results open when combat ends.")
-		else
-			print("|cffe0b060ClaiibuAPI|r Dispel recorder off.")
-		end
-		return
-	end
-	if unit == "raw" or unit:find("^raw ") then
-		local target = strtrim(unit:sub(4))
-		local units = target ~= "" and { target } or { "player", "target", "party1", "party2", "party3", "party4" }
-		local _, class = UnitClass("player")
-		local lines = { "Your class: " .. Show(class) .. ". In combat: " .. ((InCombatLockdown and InCombatLockdown()) and "yes" or "no"),
-			"Counts per filter, then up to 3 debuffs: name [type, spell].", "" }
-		for _, line in ipairs(SK.Dispel.Raw(units)) do
-			lines[#lines + 1] = line
-		end
-		SK.CopyWindow.Show("ClaiibuAPI: Raw Aura Data", lines)
-		return
-	end
-	local units = unit ~= "" and { unit } or { "player", "target", "party1", "party2", "party3", "party4" }
-	SK.CopyWindow.Show("ClaiibuAPI: Dispellable Debuffs", SK.Dispel.Report(units))
+commands.dispel = function()
+	print("|cffe0b060ClaiibuAPI|r The dispel tracker is deprecated: WoW: Forever hides auras from addons in combat. "
+		.. "Blizzard's own party and raid frames still show dispellable debuffs.")
 end
 
 commands.probe = function()
@@ -160,7 +131,7 @@ commands.version = function()
 end
 
 commands.help = function()
-	print("|cffe0b060ClaiibuAPI|r /claiibu dispel [unit] - dispellable debuffs, /claiibu dispel watch [raw] - record them in your next fights, /claiibu dispel raw [unit] - raw aura data, /claiibu probe - API check, /claiibu version")
+	print("|cffe0b060ClaiibuAPI|r /claiibu probe - API check, /claiibu version")
 end
 
 SLASH_CLAIIBUAPI1 = "/claiibu"

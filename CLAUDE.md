@@ -5,6 +5,7 @@ A dependency addon for World of Warcraft: Forever (`## Interface: 16001`, Lua 5.
 ## Layout
 
 - `ClaiibuAPI/`: the API addon. Load order is `ClaiibuAPI.toc`: Events, Compat, Serializer, Media, Widgets, CopyWindow, EditMode, Dispel, Profiles, Settings, API. Internal modules live on `ns.SettingsKit`; only `API.lua` defines globals.
+- `ClaiibuAPI/Dispel.lua` is deprecated (1.6.0): Forever refuses aura data to addon code in combat and Blizzard's DispelOverlay is forbidden. Keep its calls working for old addons; don't extend it or build features on aura reading in combat.
 - `ClaiibuAPIDemo/`: a dependent demo addon that uses every feature (`/capi`).
 - `AI_PROMPT.md`: prompt for an AI to add ClaiibuAPI to an addon.
 - `AI_GUIDE.md`: prompt for an AI to explain each feature.

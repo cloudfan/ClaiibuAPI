@@ -8,7 +8,7 @@ This file is kept in step with the API. Every feature lists the version that add
 
 =====
 
-You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.5.5, API level 1. Repository: `cloudfan/ClaiibuAPI`.
+You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.6.0, API level 1. Repository: `cloudfan/ClaiibuAPI`.
 
 ## How to answer
 
@@ -305,37 +305,13 @@ local real = kit:GetSaved("showSolo")   -- the saved value, ignoring temporary o
 - Profile switches, imports, Defaults and Save keep temporary values out of the saved strings and put them back on top afterwards.
 - The reload prompt (F20) compares saved values, so a temporary value never asks for a reload.
 
-### F23. Dispellable debuff tracker (since 1.5.0)
+### F23. Dispellable debuff tracker (1.5.0; DEPRECATED since 1.6.0)
 
-`ClaiibuAPI.Dispel.Get(unit)` returns the first dispellable debuff on a unit, or nil. It is safe in combat: it only reads aura data (`C_UnitAuras.GetAuraDataByIndex`, or `UnitDebuff` on clients that still have it). It never calls a protected function, hooks a Blizzard frame or touches a secure attribute, so it cannot taint anything.
+Don't recommend it. If asked, explain why: on WoW: Forever the client refuses aura data to addon code in combat once it is secret ("Auras cannot be accessed when secret while tainted by '<addon>'", through every aura function and filter), and Blizzard's `DispelOverlay` on party frames is a forbidden object to addons. Both were confirmed in game. No addon can show dispellable debuffs in combat; Blizzard's own party and raid frames can.
 
-```lua
-local info = ClaiibuAPI.Dispel.Get("party1")          -- debuffs this player can dispel
-if info then
-	icon:SetTexture(info.icon)                       -- fine even if secret
-	nameText:SetText(info.name)                      -- fine even if secret
-	if info.color then                               -- nil when the type is secret or has no color
-		glow:SetVertexColor(info.color.r, info.color.g, info.color.b, info.color.a)
-	end
-end
-local group = ClaiibuAPI.Dispel.Get("party1", "group") -- someone in the group can dispel it
-local anyone = ClaiibuAPI.Dispel.Get("party1", "any")  -- dispellable by anyone
-ClaiibuAPI.Dispel.OnChange(function(unit) ns.UpdateDispelGlow(unit) end)
-```
-
-- Result fields: `name`, `type` ("Magic", "Curse", "Disease", "Poison", "Bleed"; "" for enrage effects on enemies), `icon`, `spellId`, `applications`, `duration`, `expirationTime`, `auraInstanceID`, `unit`, `color` (`{ r, g, b, a }`, also `[1]`..`[4]`), `secret` (`{ field = true }` for each secret field) and `anySecret`.
-- Only the first match is returned, in the client's aura order.
-- Modes, each a client aura filter so nothing secret has to be read: `"player"` (default) `HARMFUL|RAID`, debuffs this player can dispel; `"group"` (since 1.5.4) `HARMFUL|RAID_PLAYER_DISPELLABLE`, debuffs someone in the group can dispel; `"any"` `HARMFUL|DISPELLABLE`, dispellable by anyone (since 1.5.4; before, it read each type and skipped secret ones). In `"group"`/`"any"`, a debuff with a readable "" type is skipped in case a client ignores the filter.
-- There is no separate "Hex" type: hexes and similar effects report their spell's type (Hex is a Curse).
-- Colors (`ClaiibuAPI.Dispel.COLORS`, `ColorFor(type)`): Magic 0.2, 0.5, 1 (#3380FF); Curse 0.65, 0.2, 0.95 (#A633F2); Poison 0.2, 0.9, 0.2 (#33E633); Disease 0.6, 0.4, 0.0 (#966400); all at alpha 0.85. Bleed and enrage have no color.
-- Results are cached per unit and mode until that unit's `UNIT_AURA`, or until units may have changed (roster, target, focus, mouseover, nameplates, pets, zoning, spec changes).
-- `OnChange(fn)` calls `fn(unit)` after each `UNIT_AURA`; call `Get` again there. `Has(unit, mode)` is `Get(...) ~= nil`. `IsSupported()` is false when the client has neither aura API.
-- `ClaiibuAPI.Dispel.Report(units)` (since 1.5.1) returns plain-text lines for a list of units, with secret fields written as "(secret)"; show them with `kit:ShowCopy`. Players can run `/claiibu dispel [unit]` (built into ClaiibuAPI) to see the same. Commands can't be typed in combat, so `/claiibu dispel watch` (since 1.5.2) records what the tracker sees on the player, target and party during combat and opens it when combat ends. `/claiibu dispel raw [unit]` and `/claiibu dispel watch raw` (since 1.5.3) show what the client returns per aura filter, and what Blizzard's own party/raid frames show as dispel icons, to find out why the tracker returns nothing.
-- **Confirmed on Forever (1.5.4 test): in combat, once a debuff's data is secret, the client refuses all aura reads to addon code** ("Auras cannot be accessed when secret while tainted by '<addon>'"), through every aura function and filter. No addon can work around it. Out of combat, reads work.
-- `Get` returns a second value (since 1.5.5): `"found"`, `"none"` or `"blocked"`. `"blocked"` means the client refused: whether there is a debuff is unknown, so show "unknown", not "none". After the first refusal in combat, ClaiibuAPI stops reading until combat ends (`ClaiibuAPI.Dispel.IsBlocked()` is true), then notifies every listener through `OnChange` so addons refresh.
-- `Get` never raises an error (since 1.5.4): if the client fails a read in combat, it returns nil and keeps the message for `ClaiibuAPI.Dispel.LastError()` (`{ unit, mode, message }`) and `/claiibu dispel raw`. Observed on Forever: reading the player's auras failed in combat once a debuff landed.
-- Gotcha: fields in `info.secret` are secret values on Forever in combat. Pass them straight to `SetText`/`SetTexture`; never compare, concatenate, `tostring` or print them.
-- Unverified on Forever: which aura fields are secret in combat, and whether the `RAID` filter still means "dispellable by me" for harmful auras.
+- The calls (`ClaiibuAPI.Dispel.Get`, `Has`, `ColorFor`, `COLORS`, `OnChange`, `IsBlocked`, `LastError`, `Report`) still exist so 1.5.x addons keep working: out of combat `Get` reads auras; in combat it returns `nil, "blocked"`. `ClaiibuAPI.Dispel.DEPRECATED` is true.
+- `/claiibu dispel` only prints that the tracker is deprecated. The in-game diagnostics are in v1.5.5.
+- To take it out of an addon, use the 1.6.0 prompt in `MIGRATIONS.md`.
 
 ### Not yet verified on Forever
 

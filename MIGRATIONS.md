@@ -2,6 +2,23 @@
 
 Each entry is a prompt for an AI assistant. Paste the prompt, then the addon's `.toc` and `.lua` files under it. Newest first.
 
+## 1.6.0: dispel tracker deprecated
+
+```
+Update this World of Warcraft: Forever addon (Lua 5.1, ## Interface: 16001) for ClaiibuAPI 1.6.0, which deprecates the dispellable debuff tracker.
+
+Why: on Forever the client refuses aura data to addon code in combat ("Auras cannot be accessed when secret while tainted by <addon>"), and Blizzard's DispelOverlay is a forbidden object to addons, so no addon can show dispellable debuffs in combat.
+
+1. Find every use of ClaiibuAPI.Dispel (Get, Has, ColorFor, COLORS, OnChange, IsBlocked, LastError, Report) and any dispel-related setting, page control, indicator frame, texture, color table and slash command built on it.
+2. Remove the dispel indicators and the code that feeds them, including their OnChange registration and any "unknown in combat" state.
+3. Remove dispel-related settings from the pages and from defaults. Leftover keys in saved profiles are ignored by ClaiibuAPI, so no conversion is needed.
+4. If the addon can hide or fade Blizzard's party/raid frames, add to that setting's tooltip or page text: "Blizzard's dispel highlight is hidden with them."
+5. Keep ClaiibuAPI.Require(1, addonName). The Dispel calls still exist in 1.6.0, so an addon that has not been updated keeps working; this update only removes dead features.
+6. Do not change anything else.
+
+Output every changed file in full (no fragments, no "rest unchanged"), then list what you removed.
+```
+
 ## 1.5.5: Dispel.Get status ("blocked" in combat), Dispel.IsBlocked
 
 ```

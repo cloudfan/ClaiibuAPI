@@ -22,7 +22,6 @@ local kit = API.Settings.New(addonName, {
 		"Dropdowns with left and right steppers, listing Blizzard media first, then each LibSharedMedia pack under its own heading",
 		"Anchor point and font shadow selectors",
 		"Edit Mode: move the preview panel with Blizzard's blue and yellow highlight",
-		"Dispellable debuff tracker that is safe in combat",
 		"Profiles saved as compact strings, shared across characters, with export and import",
 		"Diagnostics in a copy window, ready for Ctrl+C",
 		"A Reload UI / Ignore prompt for settings that can cause taint",
@@ -109,17 +108,6 @@ debug:Button({
 	tooltip = "kit:RequestReload(reason), for changes made outside the settings pages.",
 	onClick = function(k)
 		k:RequestReload("The demo's Ask for a Reload button")
-	end,
-})
-debug:Header("Dispellable Debuffs")
-debug:Text("ClaiibuAPI.Dispel.Get(unit) returns the first debuff on a unit that you can dispel, or nil. "
-	.. "It only reads aura data, so it is safe in combat. /capi dispel <unit> shows the same for any unit.")
-debug:Button({
-	label = "",
-	text = "Copy Dispellable Debuffs",
-	tooltip = "You, your target and your party.",
-	onClick = function()
-		Demo.ShowDispels({ "player", "target", "party1", "party2", "party3", "party4" })
 	end,
 })
 debug:Header("Diagnostics")
@@ -233,14 +221,6 @@ kit:OnReady(Demo.Apply)
 -- Keeps the preview in step with media that loads late.
 kit.events.On("PLAYER_LOGIN", Demo.Apply)
 
--- Dispel tracker -------------------------------------------------------------------
--- ClaiibuAPI.Dispel.Report writes "(secret)" for secret fields, which may
--- be shown in a FontString but never compared, concatenated or printed.
-
-function Demo.ShowDispels(units)
-	kit:ShowCopy("Dispellable Debuffs", ClaiibuAPI.Dispel.Report(units))
-end
-
 -- Slash commands ----------------------------------------------------------------------
 
 local slash = {}
@@ -257,12 +237,8 @@ slash.probe = function()
 	kit:ShowProbe()
 end
 
-slash.dispel = function(unit)
-	Demo.ShowDispels({ unit ~= "" and unit or "player" })
-end
-
 slash.help = function()
-	kit:Print("/capi - settings, /capi profiles - profiles, /capi probe - API check, /capi dispel <unit> - dispellable debuff")
+	kit:Print("/capi - settings, /capi profiles - profiles, /capi probe - API check")
 end
 
 SLASH_CLAIIBUAPIDEMO1 = "/capi"

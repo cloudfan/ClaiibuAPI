@@ -17,8 +17,8 @@ Shared code for World of Warcraft: Forever addons (`## Interface: 16001`). Claii
 - **Media dropdowns** (Font, Bar Texture, Border, Background, Sound) as one scrolling column. A **Blizzard** section comes first, including Bronze and Gold Toast borders and a Bronze Dialog border. After it come one section per addon that registered media with LibSharedMedia-3.0, titled with that addon's name.
 - **Selectors** for the anchor point (TOP LEFT, TOP CENTER, TOP RIGHT, LEFT CENTER, CENTER, RIGHT CENTER, BOTTOM LEFT, BOTTOM CENTER, BOTTOM RIGHT) and the font shadow (None, Soft, Hard, Heavy).
 - **Profiles** stored as compact strings. **Default-Global** holds the defaults. The Profiles page has Save, Delete, an Export box and an Import button.
+- ~~A dispellable debuff tracker~~: deprecated in 1.6.0, because Forever hides auras from addons in combat.
 - **Edit Mode support**: frames move in Blizzard's Edit Mode with its blue and yellow highlight, and settings can be switched on only while Edit Mode is open.
-- **A dispellable debuff tracker** that is safe in combat: `ClaiibuAPI.Dispel.Get(unit)` gives the first debuff on a unit that you can dispel, with its name, type and color.
 - **A reload prompt** (Reload UI / Ignore) for settings marked `reload = true`, whose changes can taint the UI until a reload.
 - **A copy window** for diagnostic commands: the text opens already selected, so Ctrl+C copies it.
 - **A standard landing page**: the name and version, a description and features, and the footer "Created for use by a lazy sack of shit, Maiibu. (And Friends)".
@@ -37,10 +37,6 @@ ClaiibuAPI's own commands (work without the demo):
 
 | Command | What it does |
 | --- | --- |
-| `/claiibu dispel [unit]` | The first dispellable debuff on `unit`, or on you, your target and your party, in a copy window. Says whether you are in combat; secret fields show as "(secret)" |
-| `/claiibu dispel watch` | Records dispellable debuffs during your next fights (commands can't be typed in combat) and opens the results when combat ends. Run it again to stop |
-| `/claiibu dispel raw [unit]` | Raw aura data: how many debuffs the client returns for `HARMFUL`, `HARMFUL\|RAID` and `HARMFUL\|RAID_PLAYER_DISPELLABLE`, and the first three (name, type, spell, or "(secret)"). Error messages show where a read failed. Also tries `GetAuraSlots`/`GetAuraDataBySlot` and `GetUnitAuras`. Also what Blizzard's own party/raid frames show (or, when they have no `dispelDebuffFrames`, which related fields they do have): their dispel icons (shown, texture, aura ID and the aura behind it). Shows why the tracker finds nothing |
-| `/claiibu dispel watch raw` | Records the raw aura data during your next fights instead |
 | `/claiibu probe` | Which APIs and templates this client has, and which ones ClaiibuAPI is using, in a copy window |
 | `/claiibu version` | The installed ClaiibuAPI version and API level |
 
@@ -51,7 +47,6 @@ Demo commands (`ClaiibuAPIDemo`):
 | `/capi` | Open the demo's settings |
 | `/capi profiles` | Open its Profiles page |
 | `/capi probe` | The probe, with the demo's settings details |
-| `/capi dispel <unit>` | Same as `/claiibu dispel` |
 
 ## Use it in an addon
 
@@ -154,10 +149,7 @@ Add `reload = true` to any control with a `key` whose change can taint the UI un
 | `Serializer.Encode`, `Serializer.Decode` | The profile string format, for other data |
 | `Compat.IsSecret`, `Compat.TemplateExists`, `Compat.AtlasExists`, `Compat.ProbeRows` | Capability checks |
 | `EditMode.New(addonName, spec)`, `EditMode.IsActive()` | Edit Mode movers without a kit (needs `getPosition`/`savePosition`); whether Blizzard's Edit Mode is open |
-| `Dispel.IsBlocked()` | True while the client refuses aura data (in combat on Forever); `Get` then returns `nil, "blocked"` |
-| `Dispel.LastError()` | `{ unit, mode, message }` of the last aura read that failed (Get returns nil then, it never throws), or nil |
-| `Dispel.Report(units)` | Plain-text lines describing units' dispellable debuffs (secret fields as "(secret)"), for a copy window or a debug command |
-| `Dispel.Get(unit, mode)`, `Dispel.Has`, `Dispel.ColorFor(type)`, `Dispel.COLORS`, `Dispel.OnChange(fn)`, `Dispel.IsSupported()` | The dispellable debuff tracker; see [Dispellable debuffs](#dispellable-debuffs) |
+| `Dispel.*` | **Deprecated** (1.6.0): the dispellable debuff tracker. See [Dispellable debuffs](#dispellable-debuffs-deprecated) |
 | `NewEvents()` | An event frame with a handler table, for an addon without a settings window |
 | `ShowCopyText(title, content, keepCodes)`, `HideCopyText()` | The copy window without a kit |
 
@@ -245,70 +237,18 @@ Call `ns.Layout()` from `onChange`, `onProfileChanged` and `kit:OnReady`.
 - The moved frame must not be secure. Secure children are fine, but place the root outside combat (`kit:ApplyAnchor` inside `kit.events.AfterCombat` when needed).
 - The yellow colors are estimates; the blue ones were measured on Forever build 70338.
 
-## Dispellable debuffs
+## Dispellable debuffs (deprecated)
 
-`ClaiibuAPI.Dispel.Get(unit, mode)` returns the first dispellable debuff on `unit`, or nil. If several are present, only the first (in the client's aura order) is returned.
+`ClaiibuAPI.Dispel` is **deprecated since 1.6.0**. Don't use it in new addons.
 
-```lua
-local info = ClaiibuAPI.Dispel.Get("party1")
-if info then
-	ns.dispelIcon:SetTexture(info.icon)
-	ns.dispelName:SetText(info.name)
-	if info.color then
-		ns.dispelGlow:SetVertexColor(info.color.r, info.color.g, info.color.b, info.color.a)
-	end
-end
+WoW: Forever does not let addons see dispellable debuffs in combat. Tested in game with 1.5.4 and 1.5.5:
 
-ClaiibuAPI.Dispel.OnChange(function(unit)
-	ns.UpdateDispel(unit)   -- call Get(unit) again
-end)
-```
+- Every aura read from addon code fails once a debuff's data is secret: "Auras cannot be accessed when secret while tainted by '<addon>'". This applies to `GetAuraDataByIndex`, `GetAuraSlots`/`GetAuraDataBySlot` and `GetUnitAuras`, with every filter (`HARMFUL`, `RAID`, `RAID_PLAYER_DISPELLABLE`, `DISPELLABLE`, `RAID_IN_COMBAT`).
+- Blizzard's party frames keep their dispel highlight in `DispelOverlay`, which is a forbidden object: "Attempt to access forbidden object from code tainted by an AddOn".
 
-| Mode | Returns |
-| --- | --- |
-| `"player"` (default) | The first debuff this player can dispel (`HARMFUL\|RAID` filter). |
-| `"group"` | The first debuff someone in your group can dispel (`HARMFUL\|RAID_PLAYER_DISPELLABLE`). Since 1.5.4. |
-| `"any"` | The first dispellable debuff, whoever can dispel it (`HARMFUL\|DISPELLABLE`; since 1.5.4, before that it read each debuff's type). |
+Blizzard's own party and raid frames still show dispellable debuffs in combat. Fading them with `SetAlpha(0)` hides that highlight too.
 
-**In combat on Forever, the client refuses aura data to every addon** once it is secret ("Auras cannot be accessed when secret while tainted by '<addon>'"; confirmed in game with 1.5.4). Then `Get` returns `nil, "blocked"`:
-
-```lua
-local info, status = ClaiibuAPI.Dispel.Get("party1")
-if status == "blocked" then
-	ns.ShowDispelUnknown("party1")   -- can't tell in combat; don't show "none"
-elseif info then
-	ns.ShowDispel("party1", info)
-else
-	ns.HideDispel("party1")
-end
-```
-
-`status` is `"found"`, `"none"` or `"blocked"`. After the first refusal ClaiibuAPI stops reading until combat ends (`Dispel.IsBlocked()`), then calls every `OnChange` listener so addons refresh. Blizzard's own frames still show dispellable debuffs in combat; `/claiibu dispel raw` shows what their `DispelOverlay` exposes to addons.
-
-Out of combat, the client picks the debuff in every mode, so it works even when aura fields are secret. In `"group"` and `"any"`, a debuff whose readable type is "" is skipped, in case a client ignores the filter.
-
-| Field | Meaning |
-| --- | --- |
-| `name`, `icon`, `spellId` | The debuff |
-| `type` | "Magic", "Curse", "Disease", "Poison", "Bleed" ("" for enrage). Hexes report their spell's type (Hex is a Curse). |
-| `applications`, `duration`, `expirationTime`, `auraInstanceID` | As the client reports them |
-| `color` | `{ r, g, b, a }` (also `[1]`..`[4]`) for the type, or nil for a secret or uncolored type |
-| `secret` | `{ field = true }` for each field that is a secret value |
-| `anySecret` | true when any field is secret |
-
-Colors (`ClaiibuAPI.Dispel.COLORS`):
-
-| Type | RGBA | Hex |
-| --- | --- | --- |
-| Magic | 0.2, 0.5, 1, 0.85 | #3380FF |
-| Curse | 0.65, 0.2, 0.95, 0.85 | #A633F2 |
-| Poison | 0.2, 0.9, 0.2, 0.85 | #33E633 |
-| Disease | 0.6, 0.4, 0.0, 0.85 | #966400 |
-
-- **Safe in combat:** the tracker only reads aura data. It never calls protected functions, hooks Blizzard frames or touches secure attributes, so it can't taint anything.
-- **Secret values:** on Forever some aura fields can be secret in combat. Pass them straight to `SetText`/`SetTexture`; never compare, concatenate, `tostring` or print them. Check `info.secret.<field>` first.
-- **Caching:** results are cached per unit until that unit's `UNIT_AURA` or a change of units (roster, target, focus, mouseover, nameplates, pets, zoning, spec). Calling `Get` every frame is cheap.
-
+The calls still exist so addons written for 1.5.x keep working: out of combat `Dispel.Get` reads auras as before, and in combat it returns `nil, "blocked"`. The `/claiibu dispel` commands and the in-game diagnostics were removed (they are in v1.5.5 and in git history). `MIGRATIONS.md` has a prompt for taking the tracker out of an addon.
 ## Profiles
 
 - Each profile is a string such as `PSK1:{s5:scalen1.5;s6:lockedT}` in the addon's account-wide saved variable. Only settings that differ from the defaults are written. Each character remembers its active profile in the per-character saved variable.
@@ -332,7 +272,6 @@ Nothing has been run in game yet. Run `/claiibu probe` on your build and check:
 
 - `Settings.RegisterCanvasLayoutCategory`/`Subcategory`. Without the Settings API, the pages open in a standalone window with the same list down the left.
 - `EventRegistry` "EditMode.Enter"/"EditMode.Exit" and `EditModeManagerFrame.SelectSystem`/`ClearSelectedSystem` (Edit Mode). The probe shows whether ClaiibuAPI is listening.
-- The dispel tracker: which aura fields are secret in combat, and whether `HARMFUL|RAID` still returns only debuffs this player can dispel. `/claiibu dispel <unit>` shows what it finds, in and out of combat.
 - `BasicFrameTemplateWithInset` (the copy window's frame; a plain dialog frame is used without it).
 - `SettingsCheckboxTemplate`, `SettingsDropdownWithButtonsTemplate` (and its `Dropdown`, `DecrementButton`, `IncrementButton` children), `MinimalSliderWithSteppersTemplate`, `ScrollFrameTemplate`, `InputScrollFrameTemplate`.
 - The `OnDefault`/`OnRefresh` hooks that the settings panel calls on a canvas frame.
