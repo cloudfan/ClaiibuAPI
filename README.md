@@ -154,6 +154,7 @@ Add `reload = true` to any control with a `key` whose change can taint the UI un
 | `Serializer.Encode`, `Serializer.Decode` | The profile string format, for other data |
 | `Compat.IsSecret`, `Compat.TemplateExists`, `Compat.AtlasExists`, `Compat.ProbeRows` | Capability checks |
 | `EditMode.New(addonName, spec)`, `EditMode.IsActive()` | Edit Mode movers without a kit (needs `getPosition`/`savePosition`); whether Blizzard's Edit Mode is open |
+| `Dispel.IsBlocked()` | True while the client refuses aura data (in combat on Forever); `Get` then returns `nil, "blocked"` |
 | `Dispel.LastError()` | `{ unit, mode, message }` of the last aura read that failed (Get returns nil then, it never throws), or nil |
 | `Dispel.Report(units)` | Plain-text lines describing units' dispellable debuffs (secret fields as "(secret)"), for a copy window or a debug command |
 | `Dispel.Get(unit, mode)`, `Dispel.Has`, `Dispel.ColorFor(type)`, `Dispel.COLORS`, `Dispel.OnChange(fn)`, `Dispel.IsSupported()` | The dispellable debuff tracker; see [Dispellable debuffs](#dispellable-debuffs) |
@@ -269,7 +270,22 @@ end)
 | `"group"` | The first debuff someone in your group can dispel (`HARMFUL\|RAID_PLAYER_DISPELLABLE`). Since 1.5.4. |
 | `"any"` | The first dispellable debuff, whoever can dispel it (`HARMFUL\|DISPELLABLE`; since 1.5.4, before that it read each debuff's type). |
 
-The client picks the debuff in every mode, so this works even when aura fields are secret. In `"group"` and `"any"`, a debuff whose readable type is "" is skipped, in case a client ignores the filter.
+**In combat on Forever, the client refuses aura data to every addon** once it is secret ("Auras cannot be accessed when secret while tainted by '<addon>'"; confirmed in game with 1.5.4). Then `Get` returns `nil, "blocked"`:
+
+```lua
+local info, status = ClaiibuAPI.Dispel.Get("party1")
+if status == "blocked" then
+	ns.ShowDispelUnknown("party1")   -- can't tell in combat; don't show "none"
+elseif info then
+	ns.ShowDispel("party1", info)
+else
+	ns.HideDispel("party1")
+end
+```
+
+`status` is `"found"`, `"none"` or `"blocked"`. After the first refusal ClaiibuAPI stops reading until combat ends (`Dispel.IsBlocked()`), then calls every `OnChange` listener so addons refresh. Blizzard's own frames still show dispellable debuffs in combat; `/claiibu dispel raw` shows what their `DispelOverlay` exposes to addons.
+
+Out of combat, the client picks the debuff in every mode, so it works even when aura fields are secret. In `"group"` and `"any"`, a debuff whose readable type is "" is skipped, in case a client ignores the filter.
 
 | Field | Meaning |
 | --- | --- |

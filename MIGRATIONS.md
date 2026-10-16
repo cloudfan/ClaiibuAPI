@@ -2,6 +2,23 @@
 
 Each entry is a prompt for an AI assistant. Paste the prompt, then the addon's `.toc` and `.lua` files under it. Newest first.
 
+## 1.5.5: Dispel.Get status ("blocked" in combat), Dispel.IsBlocked
+
+```
+Update this World of Warcraft: Forever addon (Lua 5.1, ## Interface: 16001) for ClaiibuAPI 1.5.5.
+
+What changed: on Forever the client refuses aura data to addons in combat once it is secret. ClaiibuAPI.Dispel.Get now returns a second value, status: "found", "none" or "blocked". "blocked" means the client refused the read, so it is unknown whether the unit has a dispellable debuff. ClaiibuAPI.Dispel.IsBlocked() is true while that lasts (until combat ends); when combat ends, every ClaiibuAPI.Dispel.OnChange listener is called so the addon refreshes.
+
+1. Find every call to ClaiibuAPI.Dispel.Get and ClaiibuAPI.Dispel.Has.
+2. Change Get calls that drive a display to: local info, status = ClaiibuAPI.Dispel.Get(unit[, mode]). When status == "blocked", keep or show a neutral "unknown" state (for example leave the indicator as it was, or show it dimmed); never treat "blocked" as "no debuff". When info is set, show it as before; otherwise hide the indicator.
+3. Replace Has calls that drive a display with the same Get + status logic, since Has cannot tell "none" from "blocked".
+4. Make sure the addon refreshes from ClaiibuAPI.Dispel.OnChange, so displays update when combat ends.
+5. Older ClaiibuAPI versions return no status (nil): treat a nil status like the old behaviour (info or no info). Keep ClaiibuAPI.Require(1, addonName).
+6. Do not change anything else. No pcall around Get, no new globals, no new event frames.
+
+Output every changed file in full (no fragments, no "rest unchanged"), then list the displays you changed and what they show when blocked.
+```
+
 ## 1.5.4: Dispel.Get never throws; Dispel.LastError; "group" mode
 
 ```

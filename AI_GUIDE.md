@@ -8,7 +8,7 @@ This file is kept in step with the API. Every feature lists the version that add
 
 =====
 
-You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.5.4, API level 1. Repository: `cloudfan/ClaiibuAPI`.
+You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.5.5, API level 1. Repository: `cloudfan/ClaiibuAPI`.
 
 ## How to answer
 
@@ -331,6 +331,8 @@ ClaiibuAPI.Dispel.OnChange(function(unit) ns.UpdateDispelGlow(unit) end)
 - Results are cached per unit and mode until that unit's `UNIT_AURA`, or until units may have changed (roster, target, focus, mouseover, nameplates, pets, zoning, spec changes).
 - `OnChange(fn)` calls `fn(unit)` after each `UNIT_AURA`; call `Get` again there. `Has(unit, mode)` is `Get(...) ~= nil`. `IsSupported()` is false when the client has neither aura API.
 - `ClaiibuAPI.Dispel.Report(units)` (since 1.5.1) returns plain-text lines for a list of units, with secret fields written as "(secret)"; show them with `kit:ShowCopy`. Players can run `/claiibu dispel [unit]` (built into ClaiibuAPI) to see the same. Commands can't be typed in combat, so `/claiibu dispel watch` (since 1.5.2) records what the tracker sees on the player, target and party during combat and opens it when combat ends. `/claiibu dispel raw [unit]` and `/claiibu dispel watch raw` (since 1.5.3) show what the client returns per aura filter, and what Blizzard's own party/raid frames show as dispel icons, to find out why the tracker returns nothing.
+- **Confirmed on Forever (1.5.4 test): in combat, once a debuff's data is secret, the client refuses all aura reads to addon code** ("Auras cannot be accessed when secret while tainted by '<addon>'"), through every aura function and filter. No addon can work around it. Out of combat, reads work.
+- `Get` returns a second value (since 1.5.5): `"found"`, `"none"` or `"blocked"`. `"blocked"` means the client refused: whether there is a debuff is unknown, so show "unknown", not "none". After the first refusal in combat, ClaiibuAPI stops reading until combat ends (`ClaiibuAPI.Dispel.IsBlocked()` is true), then notifies every listener through `OnChange` so addons refresh.
 - `Get` never raises an error (since 1.5.4): if the client fails a read in combat, it returns nil and keeps the message for `ClaiibuAPI.Dispel.LastError()` (`{ unit, mode, message }`) and `/claiibu dispel raw`. Observed on Forever: reading the player's auras failed in combat once a debuff landed.
 - Gotcha: fields in `info.secret` are secret values on Forever in combat. Pass them straight to `SetText`/`SetTexture`; never compare, concatenate, `tostring` or print them.
 - Unverified on Forever: which aura fields are secret in combat, and whether the `RAID` filter still means "dispellable by me" for harmful auras.

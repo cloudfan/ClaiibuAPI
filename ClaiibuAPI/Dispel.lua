@@ -134,16 +134,37 @@ local cache = {}
 -- expirationTime, auraInstanceID, color, secret = { field = true },
 -- anySecret }. Fields listed in secret are secret values: show them
 -- (SetText, SetTexture) but never compare or print them.
+-- Forever refuses aura data to addon code in combat once it is secret
+-- ("Auras cannot be accessed when secret while tainted by <addon>"), and
+-- that cannot be worked around. After the first refusal, reads stop until
+-- combat ends and Get reports "blocked", so an addon can show "unknown"
+-- instead of "none".
+local blocked = false
+
+local function IsRefusal(message)
+	return type(message) == "string" and message:find("cannot be accessed when secret", 1, true) ~= nil
+end
+
+function Dispel.IsBlocked()
+	return blocked
+end
+
+-- Returns info, status. status is "found", "none" or "blocked" (the client
+-- refused the read in combat; whether there is a debuff is unknown).
 function Dispel.Get(unit, mode)
 	if type(unit) ~= "string" then
-		return nil
+		return nil, "none"
+	end
+	if blocked then
+		return nil, "blocked"
 	end
 	if mode ~= "any" and mode ~= "group" then
 		mode = "player"
 	end
 	local byMode = cache[unit]
 	if byMode and byMode[mode] ~= nil then
-		return byMode[mode] or nil
+		local cached = byMode[mode]
+		return cached or nil, cached and "found" or "none"
 	end
 	-- Reading auras is not protected, but on Forever a secret value can make
 	-- the read fail in combat. That must never become an error in the
@@ -152,11 +173,16 @@ function Dispel.Get(unit, mode)
 	local ok, result = pcall(Scan, unit, mode)
 	if not ok then
 		Dispel.lastError = { unit = unit, mode = mode, message = tostring(result) }
-		return nil
+		if IsRefusal(result) and InCombatLockdown and InCombatLockdown() then
+			blocked = true
+			cache = {}
+			return nil, "blocked"
+		end
+		return nil, "none"
 	end
 	cache[unit] = byMode or {}
 	cache[unit][mode] = result or false
-	return result
+	return result, result and "found" or "none"
 end
 
 -- The last read that failed, as { unit, mode, message }, or nil.
@@ -188,8 +214,10 @@ function Dispel.Report(units)
 	local combat = InCombatLockdown and InCombatLockdown()
 	lines[1] = "In combat: " .. (combat and "yes" or "no")
 	for _, unit in ipairs(units) do
-		local info = Dispel.Get(unit)
-		if info then
+		local info, status = Dispel.Get(unit)
+		if status == "blocked" then
+			lines[#lines + 1] = unit .. ": unknown - the client hides auras from addons in combat"
+		elseif info then
 			lines[#lines + 1] = unit .. ": " .. Field(info, "name") .. " (" .. Field(info, "type") .. "), spell "
 				.. Field(info, "spellId") .. ", stacks " .. Field(info, "applications")
 		else
@@ -235,6 +263,19 @@ end)
 local function ClearAll()
 	cache = {}
 end
+
+SK.Events.On("PLAYER_REGEN_ENABLED", function()
+	if blocked then
+		blocked = false
+		cache = {}
+		-- Auras are readable again; let addons refresh every unit.
+		Notify("player")
+		for i = 1, 4 do
+			Notify("party" .. i)
+		end
+		Notify("target")
+	end
+end)
 for _, event in ipairs({ "GROUP_ROSTER_UPDATE", "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED",
 	"UPDATE_MOUSEOVER_UNIT", "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "UNIT_PET",
 	"PLAYER_ENTERING_WORLD", "SPELLS_CHANGED" }) do
@@ -391,6 +432,50 @@ local function FrameUnit(frame)
 end
 
 -- One line describing a Blizzard frame's dispel icons.
+local function Number(value)
+	if type(value) == "number" and not C.IsSecret(value) then
+		return format("%.2f", value)
+	end
+	return Show(value)
+end
+
+-- Blizzard's DispelOverlay on a party/raid frame: its state, fields and
+-- textures (shown, color, atlas). Read only.
+local function DescribeOverlay(frame)
+	local overlay = frame.DispelOverlay
+	if type(overlay) ~= "table" then
+		return "DispelOverlay: none"
+	end
+	local parts = {
+		"shown " .. Show(overlay.IsShown and overlay:IsShown()),
+		"visible " .. Show(overlay.IsVisible and overlay:IsVisible()),
+		"alpha " .. Number(overlay.GetAlpha and overlay:GetAlpha()),
+	}
+	local keys = {}
+	for key, value in pairs(overlay) do
+		if type(key) == "string" then
+			keys[#keys + 1] = key .. " (" .. (C.IsSecret(value) and "secret" or type(value)) .. ")"
+		end
+	end
+	table.sort(keys)
+	parts[#parts + 1] = "fields: " .. (#keys > 0 and table.concat(keys, ", ") or "none")
+	if overlay.GetRegions then
+		local regions = { overlay:GetRegions() }
+		for i = 1, math.min(#regions, 6) do
+			local region = regions[i]
+			if region.GetObjectType and region:GetObjectType() == "Texture" then
+				local r, g, b, a = region:GetVertexColor()
+				local atlas = region.GetAtlas and region:GetAtlas()
+				local texture = region.GetTexture and region:GetTexture()
+				parts[#parts + 1] = "texture " .. i .. ": shown " .. Show(region:IsShown()) .. ", color "
+					.. Number(r) .. " " .. Number(g) .. " " .. Number(b) .. " " .. Number(a)
+					.. ", atlas " .. Show(atlas) .. ", file " .. Show(texture)
+			end
+		end
+	end
+	return "DispelOverlay: " .. table.concat(parts, "; ")
+end
+
 local function DescribeBlizzardFrame(frame, unit)
 	local name = frame.GetName and frame:GetName() or "?"
 	local line = name .. " (" .. unit .. ", shown " .. Show(frame:IsShown()) .. ", alpha "
@@ -453,7 +538,10 @@ function Dispel.BlizzardRaw(units)
 			matched = matched + 1
 			-- pcall only guards against frame internals that differ on this build.
 			local ok, line = pcall(DescribeBlizzardFrame, frame, unit)
-			lines[#lines + 1] = "Blizzard " .. (ok and line or ((frame.GetName and frame:GetName() or "?") .. ": could not be read"))
+			local frameName = frame.GetName and frame:GetName() or "?"
+			lines[#lines + 1] = "Blizzard " .. (ok and line or (frameName .. ": could not be read: " .. Clean(line)))
+			local okOverlay, overlay = pcall(DescribeOverlay, frame)
+			lines[#lines + 1] = "Blizzard " .. frameName .. " " .. (okOverlay and overlay or ("DispelOverlay could not be read: " .. Clean(overlay)))
 		end
 	end
 	if matched == 0 then

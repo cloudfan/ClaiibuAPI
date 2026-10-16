@@ -77,7 +77,7 @@ API.EditMode = {
 
 -- Dispellable debuffs, safe in combat (reads auras only; secret fields are
 -- passed through and flagged, never compared).
---   Get(unit, mode)  -> first dispellable debuff or nil; mode "player" (default), "group" or "any"
+--   Get(unit, mode)  -> info or nil, status ("found", "none" or "blocked"); mode "player" (default), "group" or "any"
 --   Has(unit, mode)  -> boolean
 --   ColorFor(type)   -> { r, g, b, a } or nil
 --   OnChange(fn)     -> fn(unit) after a unit's auras change
@@ -86,6 +86,7 @@ API.Dispel = {
 	Has = SK.Dispel.Has,
 	ColorFor = SK.Dispel.ColorFor,
 	OnChange = SK.Dispel.OnChange,
+	IsBlocked = SK.Dispel.IsBlocked, -- true while the client refuses aura data (in combat on Forever)
 	LastError = SK.Dispel.LastError, -- LastError() -> { unit, mode, message } of the last failed read, or nil
 	IsSupported = SK.Dispel.IsSupported,
 	Report = SK.Dispel.Report,       -- Report(units) -> lines of plain text, secret fields as "(secret)"
