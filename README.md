@@ -31,15 +31,24 @@ Copy both folders into:
 World of Warcraft\_classic_beta_\Interface\AddOns\
 ```
 
-so you have `AddOns\ClaiibuAPI\` and `AddOns\ClaiibuAPIDemo\`. Players only need `ClaiibuAPI` plus the addons that use it. Restart the client if a new addon folder doesn't show up (`/reload` is not enough).
+so you have `AddOns\ClaiibuAPI\` and `AddOns\ClaiibuAPIDemo\`. When updating, replace **both** folders: the demo's commands only know the features of its own version. Players only need `ClaiibuAPI` plus the addons that use it. Restart the client if a new addon folder doesn't show up (`/reload` is not enough).
 
-Demo commands:
+ClaiibuAPI's own commands (work without the demo):
+
+| Command | What it does |
+| --- | --- |
+| `/claiibu dispel [unit]` | The first dispellable debuff on `unit`, or on you, your target and your party, in a copy window. Says whether you are in combat; secret fields show as "(secret)" |
+| `/claiibu probe` | Which APIs and templates this client has, and which ones ClaiibuAPI is using, in a copy window |
+| `/claiibu version` | The installed ClaiibuAPI version and API level |
+
+Demo commands (`ClaiibuAPIDemo`):
 
 | Command | What it does |
 | --- | --- |
 | `/capi` | Open the demo's settings |
 | `/capi profiles` | Open its Profiles page |
-| `/capi probe` | Show which APIs and templates this client has, and which ones ClaiibuAPI is using, in a copy window |
+| `/capi probe` | The probe, with the demo's settings details |
+| `/capi dispel <unit>` | Same as `/claiibu dispel` |
 
 ## Use it in an addon
 
@@ -142,6 +151,7 @@ Add `reload = true` to any control with a `key` whose change can taint the UI un
 | `Serializer.Encode`, `Serializer.Decode` | The profile string format, for other data |
 | `Compat.IsSecret`, `Compat.TemplateExists`, `Compat.AtlasExists`, `Compat.ProbeRows` | Capability checks |
 | `EditMode.New(addonName, spec)`, `EditMode.IsActive()` | Edit Mode movers without a kit (needs `getPosition`/`savePosition`); whether Blizzard's Edit Mode is open |
+| `Dispel.Report(units)` | Plain-text lines describing units' dispellable debuffs (secret fields as "(secret)"), for a copy window or a debug command |
 | `Dispel.Get(unit, mode)`, `Dispel.Has`, `Dispel.ColorFor(type)`, `Dispel.COLORS`, `Dispel.OnChange(fn)`, `Dispel.IsSupported()` | The dispellable debuff tracker; see [Dispellable debuffs](#dispellable-debuffs) |
 | `NewEvents()` | An event frame with a handler table, for an addon without a settings window |
 | `ShowCopyText(title, content, keepCodes)`, `HideCopyText()` | The copy window without a kit |
@@ -295,11 +305,11 @@ Colors (`ClaiibuAPI.Dispel.COLORS`):
 
 ## Not yet verified on Forever
 
-Nothing has been run in game yet. Run `/capi probe` on your build and check:
+Nothing has been run in game yet. Run `/claiibu probe` on your build and check:
 
 - `Settings.RegisterCanvasLayoutCategory`/`Subcategory`. Without the Settings API, the pages open in a standalone window with the same list down the left.
 - `EventRegistry` "EditMode.Enter"/"EditMode.Exit" and `EditModeManagerFrame.SelectSystem`/`ClearSelectedSystem` (Edit Mode). The probe shows whether ClaiibuAPI is listening.
-- The dispel tracker: which aura fields are secret in combat, and whether `HARMFUL|RAID` still returns only debuffs this player can dispel. `/capi dispel <unit>` shows what it finds.
+- The dispel tracker: which aura fields are secret in combat, and whether `HARMFUL|RAID` still returns only debuffs this player can dispel. `/claiibu dispel <unit>` shows what it finds, in and out of combat.
 - `BasicFrameTemplateWithInset` (the copy window's frame; a plain dialog frame is used without it).
 - `SettingsCheckboxTemplate`, `SettingsDropdownWithButtonsTemplate` (and its `Dropdown`, `DecrementButton`, `IncrementButton` children), `MinimalSliderWithSteppersTemplate`, `ScrollFrameTemplate`, `InputScrollFrameTemplate`.
 - The `OnDefault`/`OnRefresh` hooks that the settings panel calls on a canvas frame.

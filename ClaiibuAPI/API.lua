@@ -87,6 +87,7 @@ API.Dispel = {
 	ColorFor = SK.Dispel.ColorFor,
 	OnChange = SK.Dispel.OnChange,
 	IsSupported = SK.Dispel.IsSupported,
+	Report = SK.Dispel.Report,       -- Report(units) -> lines of plain text, secret fields as "(secret)"
 	TYPES = SK.Dispel.TYPES,
 	COLORS = SK.Dispel.COLORS,
 }
@@ -107,3 +108,31 @@ function API.Require(level, owner)
 end
 
 ClaiibuAPI = API
+
+-- /claiibu: diagnostics that work without the demo addon.
+local commands = {}
+
+commands.dispel = function(unit)
+	local units = unit ~= "" and { unit } or { "player", "target", "party1", "party2", "party3", "party4" }
+	SK.CopyWindow.Show("ClaiibuAPI: Dispellable Debuffs", SK.Dispel.Report(units))
+end
+
+commands.probe = function()
+	SK.CopyWindow.Show("ClaiibuAPI: Diagnostics", C.ProbeRows(nil))
+end
+
+commands.version = function()
+	print("|cffe0b060ClaiibuAPI|r version " .. API.VERSION .. ", API level " .. API.API_LEVEL)
+end
+
+commands.help = function()
+	print("|cffe0b060ClaiibuAPI|r /claiibu dispel [unit] - dispellable debuffs, /claiibu probe - API check, /claiibu version")
+end
+
+SLASH_CLAIIBUAPI1 = "/claiibu"
+SLASH_CLAIIBUAPI2 = "/claiibuapi"
+SlashCmdList.CLAIIBUAPI = function(msg)
+	local command, rest = strlower(strtrim(msg or "")):match("^(%S*)%s*(.-)$")
+	local handler = commands[command] or commands.help
+	handler(rest)
+end

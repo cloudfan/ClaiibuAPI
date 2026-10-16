@@ -2,7 +2,7 @@
 ## Title: ClaiibuAPI Demo
 ## Notes: Shows every ClaiibuAPI settings control with a small preview panel. Also the template for a new addon.
 ## Author: cloudfan
-## Version: 1.0.0
+## Version: 1.5.1
 ## Dependencies: ClaiibuAPI
 ## SavedVariables: ClaiibuAPIDemoDB
 ## SavedVariablesPerCharacter: ClaiibuAPIDemoCharDB

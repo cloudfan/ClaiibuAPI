@@ -146,6 +146,40 @@ function Dispel.Has(unit, mode)
 	return Dispel.Get(unit, mode) ~= nil
 end
 
+-- Plain-text lines describing units' dispellable debuffs, for a copy
+-- window or chat. Secret fields are written as "(secret)": they are never
+-- concatenated, compared or printed.
+local function Field(info, field)
+	if info.secret[field] then
+		return "(secret)"
+	end
+	return tostring(info[field])
+end
+
+function Dispel.Report(units)
+	local lines = {}
+	if not Dispel.IsSupported() then
+		lines[1] = "This client has no aura API the dispel tracker can read."
+		return lines
+	end
+	local combat = InCombatLockdown and InCombatLockdown()
+	lines[1] = "In combat: " .. (combat and "yes" or "no")
+	for _, unit in ipairs(units) do
+		local info = Dispel.Get(unit)
+		if info then
+			lines[#lines + 1] = unit .. ": " .. Field(info, "name") .. " (" .. Field(info, "type") .. "), spell "
+				.. Field(info, "spellId") .. ", stacks " .. Field(info, "applications")
+		else
+			lines[#lines + 1] = unit .. ": none you can dispel"
+		end
+		local any = Dispel.Get(unit, "any")
+		if any and not info then
+			lines[#lines + 1] = "  (someone else could dispel: " .. Field(any, "name") .. ", " .. Field(any, "type") .. ")"
+		end
+	end
+	return lines
+end
+
 function Dispel.IsSupported()
 	return (C_UnitAuras ~= nil and C_UnitAuras.GetAuraDataByIndex ~= nil) or UnitDebuff ~= nil
 end

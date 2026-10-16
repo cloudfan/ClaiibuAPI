@@ -234,37 +234,11 @@ kit:OnReady(Demo.Apply)
 kit.events.On("PLAYER_LOGIN", Demo.Apply)
 
 -- Dispel tracker -------------------------------------------------------------------
--- Writes "(secret)" for secret fields: they may be shown in a FontString,
--- but never compared, concatenated or printed.
-
-local function Field(info, field)
-	if info.secret[field] then
-		return "(secret)"
-	end
-	return tostring(info[field])
-end
+-- ClaiibuAPI.Dispel.Report writes "(secret)" for secret fields, which may
+-- be shown in a FontString but never compared, concatenated or printed.
 
 function Demo.ShowDispels(units)
-	local Dispel = ClaiibuAPI.Dispel
-	if not (Dispel and Dispel.IsSupported()) then
-		kit:Print("This client has no aura API the dispel tracker can read.")
-		return
-	end
-	local lines = {}
-	for _, unit in ipairs(units) do
-		local info = Dispel.Get(unit)
-		if info then
-			lines[#lines + 1] = unit .. ": " .. Field(info, "name") .. " (" .. Field(info, "type") .. "), spell "
-				.. Field(info, "spellId") .. ", stacks " .. Field(info, "applications")
-		else
-			lines[#lines + 1] = unit .. ": none you can dispel"
-		end
-		local any = Dispel.Get(unit, "any")
-		if any and not info then
-			lines[#lines + 1] = "  (someone else could dispel: " .. Field(any, "name") .. ", " .. Field(any, "type") .. ")"
-		end
-	end
-	kit:ShowCopy("Dispellable Debuffs", lines)
+	kit:ShowCopy("Dispellable Debuffs", ClaiibuAPI.Dispel.Report(units))
 end
 
 -- Slash commands ----------------------------------------------------------------------

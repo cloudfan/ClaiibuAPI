@@ -49,8 +49,8 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "ClaiibuAPI ${TAG}" \
             --prerelease \
-            --notes "ClaiibuAPI, a dependency addon for WoW: Forever (## Interface: 16001), plus ClaiibuAPIDemo. Not yet tested in-game; run /capi probe on your build.
+            --notes "ClaiibuAPI, a dependency addon for WoW: Forever (## Interface: 16001), plus ClaiibuAPIDemo. Not yet tested in-game; run /claiibu probe on your build.
 
-          Unzip into World of Warcraft\\_classic_beta_\\Interface\\AddOns\\ so you have AddOns\\ClaiibuAPI\\ and AddOns\\ClaiibuAPIDemo\\. Players need ClaiibuAPI plus the addons that use it; the demo is optional. Restart the client if an addon does not appear.
+          Unzip into World of Warcraft\\_classic_beta_\\Interface\\AddOns\\ so you have AddOns\\ClaiibuAPI\\ and AddOns\\ClaiibuAPIDemo\\. When updating, replace both folders. Players need ClaiibuAPI plus the addons that use it; the demo is optional. Restart the client if an addon does not appear.
 
           Addons use it with ## Dependencies: ClaiibuAPI. See README.md, AI_PROMPT.md and AI_GUIDE.md inside the ClaiibuAPI folder."

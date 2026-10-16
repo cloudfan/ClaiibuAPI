@@ -2,6 +2,21 @@
 
 Each entry is a prompt for an AI assistant. Paste the prompt, then the addon's `.toc` and `.lua` files under it. Newest first.
 
+## 1.5.1: /claiibu commands and Dispel.Report
+
+```
+Update this World of Warcraft: Forever addon (Lua 5.1, ## Interface: 16001) for ClaiibuAPI 1.5.1.
+
+What changed: ClaiibuAPI now has its own /claiibu command (dispel, probe, version) and a new ClaiibuAPI.Dispel.Report(units) that returns plain-text lines describing units' dispellable debuffs, with secret fields written as "(secret)".
+
+1. If the addon has its own debug command that lists dispellable debuffs by building lines from ClaiibuAPI.Dispel.Get, replace that code with: ns.kit:ShowCopy("<title>", ClaiibuAPI.Dispel.Report({ <units> })), guarded with if ClaiibuAPI.Dispel and ClaiibuAPI.Dispel.Report then ... else <the old code> end.
+2. If the addon has no such command, change nothing: players can use /claiibu dispel [unit].
+3. Do not register /claiibu or /claiibuapi in the addon. Keep ClaiibuAPI.Require(1, addonName).
+4. Do not change anything else.
+
+Output every changed file in full (no fragments, no "rest unchanged"). If nothing needed to change, say so and output no files.
+```
+
 ## 1.5.0: dispellable debuff tracker
 
 ```
