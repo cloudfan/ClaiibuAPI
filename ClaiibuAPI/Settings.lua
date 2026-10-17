@@ -96,7 +96,9 @@ function PageSpec:Anchor(spec)
 	return Add(self, "Anchor", spec)
 end
 
--- spec: key, label, tooltip, hasAlpha. The default must be a color table
+-- spec: key, label, tooltip, hasAlpha, presets. A dropdown of preset colors
+-- ("Default", spec.presets or the standard list, then "Custom..." which
+-- opens Blizzard's color picker). The default must be a color table
 -- { r = 1, g = 1, b = 1, a = 1 } (0-1); read it with kit:GetColor(key).
 function PageSpec:Color(spec)
 	return Add(self, "Color", spec)
@@ -502,6 +504,7 @@ function BUILD.Color(kit, page, spec)
 	bound.set = function(color)
 		set(W.NormalizeColor(color, default))
 	end
+	bound.default = default
 	page:Color(bound)
 end
 

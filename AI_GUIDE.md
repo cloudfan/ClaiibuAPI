@@ -8,7 +8,7 @@ This file is kept in step with the API. Every feature lists the version that add
 
 =====
 
-You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.7.0, API level 1. Repository: `cloudfan/ClaiibuAPI`.
+You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.8.0, API level 1. Repository: `cloudfan/ClaiibuAPI`.
 
 ## How to answer
 
@@ -307,17 +307,21 @@ local real = kit:GetSaved("showSolo")   -- the saved value, ignoring temporary o
 
 ### F24. Color selector (since 1.7.0)
 
-`page:Color({ key, label, tooltip, hasAlpha })`: a swatch showing the color and its hex code. Clicking it opens Blizzard's color picker (`ColorPickerFrame`); the color changes live while the player picks, and Cancel puts the old one back. The setting is saved as `{ r, g, b, a }` (0-1).
+`page:Color({ key, label, tooltip, hasAlpha, presets })`: a dropdown of colors, each with a small sample: **Default** (the setting's default), the presets, and last **Custom...** (since 1.8.0; 1.7.0 showed only a swatch). Choosing Custom opens Blizzard's color picker (`ColorPickerFrame`); the color changes live while the player picks, and Cancel puts the old one back. While Custom is chosen, a swatch with the hex code appears beside the dropdown and reopens the picker. The setting is saved as `{ r, g, b, a }` (0-1), with `custom = true` when picked by hand.
 
 ```lua
 defaults = { barColor = { r = 0.1, g = 0.8, b = 0.1, a = 1 }, textColor = { r = 1, g = 1, b = 1, a = 1 } },
 page:Color({ key = "barColor", label = "Bar Color", hasAlpha = true })
 page:Color({ key = "textColor", label = "Text Color" })
+page:Color({ key = "borderTint", label = "Border Tint",
+	presets = { { key = "gold", label = "Gold", r = 1, g = 0.82, b = 0 }, { key = "bronze", label = "Bronze", r = 0.85, g = 0.6, b = 0.35 } } })
 -- later:
 bar:SetStatusBarColor(kit:GetColor("barColor"))
 text:SetTextColor(kit:GetColor("textColor"))
 ```
 
+- Standard presets: White, Black, Gray, Gold, Bronze, Silver, Red, Orange, Yellow, Green, Teal, Blue, Purple, Pink. Replace them with `presets = { { key = "ember", label = "Ember", r = 1, g = 0.4, b = 0.1 }, ... }`. Choosing a preset keeps the current alpha.
+- The dropdown shows the preset whose color matches the saved one; a hand-picked color (or one matching nothing) shows Custom.
 - `kit:GetColor(key)` returns `r, g, b, a`; missing or out-of-range parts are filled from the default and clamped to 0-1.
 - `hasAlpha = true` adds the picker's opacity slider; without it, alpha stays as saved (1 by default).
 - The default must be a color table; anything else is an error when the settings load.

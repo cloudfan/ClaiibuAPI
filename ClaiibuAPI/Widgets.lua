@@ -469,10 +469,32 @@ function Page:Dropdown(spec)
 end
 
 -- Color ----------------------------------------------------------------------------
--- A swatch that opens Blizzard's ColorPickerFrame. The value is a table
--- { r, g, b, a } (0-1). Dragging in the picker previews the color live;
+-- A dropdown of preset colors, each shown with a sample, ending in
+-- "Custom...". Choosing Custom opens Blizzard's ColorPickerFrame, and a
+-- swatch beside the dropdown (shown only while Custom is chosen) opens it
+-- again. The value is a table { r, g, b, a } (0-1), plus custom = true when
+-- it was picked by hand. Dragging in the picker previews the color live;
 -- Cancel puts the old one back.
--- spec: label, tooltip, hasAlpha, get() -> color, set(color)
+-- spec: label, tooltip, hasAlpha, presets, default, get() -> color, set(color)
+
+-- The presets every color setting offers unless it passes its own
+-- (spec.presets = { { key, label, r, g, b }, ... }).
+W.COLOR_PRESETS = {
+	{ key = "white", label = "White", r = 1, g = 1, b = 1 },
+	{ key = "black", label = "Black", r = 0, g = 0, b = 0 },
+	{ key = "gray", label = "Gray", r = 0.5, g = 0.5, b = 0.5 },
+	{ key = "gold", label = "Gold", r = 1, g = 0.82, b = 0 },
+	{ key = "bronze", label = "Bronze", r = 0.85, g = 0.6, b = 0.35 },
+	{ key = "silver", label = "Silver", r = 0.75, g = 0.75, b = 0.8 },
+	{ key = "red", label = "Red", r = 0.85, g = 0.1, b = 0.1 },
+	{ key = "orange", label = "Orange", r = 1, g = 0.5, b = 0 },
+	{ key = "yellow", label = "Yellow", r = 1, g = 0.9, b = 0.2 },
+	{ key = "green", label = "Green", r = 0.1, g = 0.8, b = 0.1 },
+	{ key = "teal", label = "Teal", r = 0, g = 0.6, b = 0.6 },
+	{ key = "blue", label = "Blue", r = 0.2, g = 0.5, b = 1 },
+	{ key = "purple", label = "Purple", r = 0.6, g = 0.3, b = 0.9 },
+	{ key = "pink", label = "Pink", r = 1, g = 0.45, b = 0.7 },
+}
 
 -- A complete, fresh color table from any { r, g, b, a } (missing parts
 -- from fallback, then 1).
@@ -486,7 +508,17 @@ function W.NormalizeColor(color, fallback)
 		end
 		return math.max(0, math.min(1, value))
 	end
-	return { r = Part("r"), g = Part("g"), b = Part("b"), a = Part("a") }
+	return { r = Part("r"), g = Part("g"), b = Part("b"), a = Part("a"), custom = color.custom and true or nil }
+end
+
+local function SameRGB(a, b)
+	return math.abs(a.r - b.r) < 0.002 and math.abs(a.g - b.g) < 0.002 and math.abs(a.b - b.b) < 0.002
+end
+
+-- A small square of the color for menu text.
+local function Sample(r, g, b)
+	return format("|TInterface\\Buttons\\WHITE8X8:12:12:0:0:8:8:0:8:0:8:%d:%d:%d|t  ",
+		math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
 end
 
 function W.ColorHex(color)
@@ -559,50 +591,128 @@ end
 
 function Page:Color(spec)
 	local center = self:Row(spec.label, spec.tooltip)
-	local button = CreateFrame("Button", nil, self.frame)
-	button:SetSize(26, 26)
-	self:Place(button, center)
+	local presets = spec.presets or W.COLOR_PRESETS
+	local default = spec.default and W.NormalizeColor(spec.default)
 
-	-- A light border around the color, as Blizzard's swatches have.
-	local border = button:CreateTexture(nil, "BACKGROUND")
+	local function Current()
+		return W.NormalizeColor(spec.get(), default)
+	end
+
+	-- Which entry the dropdown shows: Custom when picked by hand, else the
+	-- default or the preset with the same color, else Custom.
+	local function SelectedKey()
+		local color = Current()
+		if color.custom then
+			return "custom"
+		end
+		if default and SameRGB(color, default) then
+			return "default"
+		end
+		for _, preset in ipairs(presets) do
+			if SameRGB(color, preset) then
+				return preset.key
+			end
+		end
+		return "custom"
+	end
+
+	local options = {}
+	if default then
+		options[#options + 1] = { key = "default", label = Sample(default.r, default.g, default.b) .. "Default" }
+	end
+	for _, preset in ipairs(presets) do
+		options[#options + 1] = { key = preset.key, label = Sample(preset.r, preset.g, preset.b) .. preset.label }
+	end
+	options[#options + 1] = { key = "custom", label = "Custom..." }
+
+	local swatchButton, hex, ShowSwatch
+
+	local function SetColor(color)
+		spec.set(color)
+		ShowSwatch()
+	end
+
+	local function OpenPicker()
+		local start = Current()
+		local opened = W.OpenColorPicker(start, spec.hasAlpha, function(color)
+			color.custom = true
+			SetColor(color)
+		end)
+		if not opened then
+			print("|cffe0b060ClaiibuAPI|r This client has no color picker.")
+		end
+	end
+
+	local ddSpec = {
+		label = spec.label,
+		tooltip = spec.tooltip,
+		options = function()
+			return options
+		end,
+		get = SelectedKey,
+		set = function(key)
+			local alpha = Current().a
+			if key == "custom" then
+				local color = Current()
+				color.custom = true
+				SetColor(color)
+				OpenPicker()
+				return
+			end
+			local source = key == "default" and default
+			if not source then
+				for _, preset in ipairs(presets) do
+					if preset.key == key then
+						source = preset
+					end
+				end
+			end
+			if source then
+				SetColor({ r = source.r, g = source.g, b = source.b, a = alpha })
+			end
+		end,
+	}
+	local build = native.dropdown and NativeDropdown or PlainDropdown
+	local _, refreshDropdown = build(self, ddSpec, center)
+
+	-- The swatch beside the dropdown, for Custom only.
+	swatchButton = CreateFrame("Button", nil, self.frame)
+	swatchButton:SetSize(24, 24)
+	self:Place(swatchButton, center, W.CONTROL_WIDTH + 8)
+	local border = swatchButton:CreateTexture(nil, "BACKGROUND")
 	border:SetAllPoints()
 	border:SetColorTexture(0.8, 0.8, 0.8, 1)
-	local back = button:CreateTexture(nil, "BORDER")
+	local back = swatchButton:CreateTexture(nil, "BORDER")
 	back:SetPoint("TOPLEFT", 2, -2)
 	back:SetPoint("BOTTOMRIGHT", -2, 2)
 	back:SetColorTexture(0, 0, 0, 1)
-	local swatch = button:CreateTexture(nil, "ARTWORK")
+	local swatch = swatchButton:CreateTexture(nil, "ARTWORK")
 	swatch:SetPoint("TOPLEFT", 3, -3)
 	swatch:SetPoint("BOTTOMRIGHT", -3, 3)
-	swatch:SetColorTexture(1, 1, 1, 1)
-	button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+	swatchButton:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+	swatchButton:SetScript("OnClick", OpenPicker)
+	W.AttachTooltip(swatchButton, spec.label, "Click to change the custom color.")
+	hex = self.frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	hex:SetPoint("LEFT", swatchButton, "RIGHT", 6, 0)
 
-	local hex = self.frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	hex:SetPoint("LEFT", button, "RIGHT", 8, 0)
-
-	local function Show(color)
+	ShowSwatch = function()
+		local color = Current()
+		local custom = SelectedKey() == "custom"
+		swatchButton:SetShown(custom)
+		hex:SetShown(custom)
 		swatch:SetColorTexture(color.r, color.g, color.b, spec.hasAlpha and color.a or 1)
 		local text = "#" .. W.ColorHex(color)
 		if spec.hasAlpha then
 			text = text .. format("  %d%%", math.floor(color.a * 100 + 0.5))
 		end
 		hex:SetText(text)
+		-- Next frame: the dropdown may be in the middle of its own click.
+		SK.Events.Defer(swatchButton, refreshDropdown)
 	end
 
-	button:SetScript("OnClick", function()
-		local opened = W.OpenColorPicker(spec.get(), spec.hasAlpha, function(color)
-			spec.set(color)
-			Show(color)
-		end)
-		if not opened then
-			print("|cffe0b060ClaiibuAPI|r This client has no color picker.")
-		end
-	end)
-	W.AttachTooltip(button, spec.label, spec.tooltip)
-	self.controls[#self.controls + 1] = function()
-		Show(W.NormalizeColor(spec.get()))
-	end
-	return button
+	self.controls[#self.controls + 1] = ShowSwatch
+	swatchButton.dropdownSpec = ddSpec -- for tests and addons that drive it
+	return swatchButton
 end
 
 -- Button ---------------------------------------------------------------------------

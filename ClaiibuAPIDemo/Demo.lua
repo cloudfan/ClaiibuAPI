@@ -41,7 +41,9 @@ local kit = API.Settings.New(addonName, {
 		barTexture = "blizzard",
 		border = "tooltip",
 		borderSize = 12,
-		background = "solid",
+		background = "dialog",
+		borderTint = { r = 1, g = 1, b = 1, a = 1 },
+		backgroundTint = { r = 1, g = 1, b = 1, a = 1 },
 		alertSound = "readycheck",
 		barColor = { r = 0.1, g = 0.7, b = 0.1, a = 1 },
 		textColor = { r = 1, g = 1, b = 1, a = 1 },
@@ -83,8 +85,11 @@ style:Header("Frame")
 style:MediaDropdown({ key = "barTexture", mediaType = "statusbar" })
 style:Color({ key = "barColor", label = "Bar Color", hasAlpha = true, tooltip = "Click to open the color picker." })
 style:MediaDropdown({ key = "border", mediaType = "border" })
+style:Color({ key = "borderTint", label = "Border Tint", tooltip = "Pick a color, or Custom... for the color picker." })
 style:Slider({ key = "borderSize", label = "Border Size", min = 1, max = 32, step = 1 })
 style:MediaDropdown({ key = "background", mediaType = "background" })
+style:Color({ key = "backgroundTint", label = "Background Tint", hasAlpha = true,
+	tooltip = "Pick a color, or Custom... for the color picker. Solid backgrounds take this color as it is." })
 style:Header("Sound")
 style:MediaDropdown({ key = "alertSound", mediaType = "sound", tooltip = "Plays when you pick it." })
 style:Button({
@@ -187,13 +192,11 @@ function Demo.Apply()
 		edgeSize = edge,
 		insets = { left = inset, right = inset, top = inset, bottom = inset },
 	})
-	local tint = border.color
-	panel:SetBackdropBorderColor(tint[1], tint[2], tint[3], tint[4])
-	if background.key == "solid" then
-		panel:SetBackdropColor(0, 0, 0, 0.8)
-	else
-		panel:SetBackdropColor(1, 1, 1, 1)
-	end
+	-- The border's own tint (Bronze, Gold...) times the Border Tint setting.
+	local base = border.color
+	local tr, tg, tb, ta = kit:GetColor("borderTint")
+	panel:SetBackdropBorderColor(base[1] * tr, base[2] * tg, base[3] * tb, base[4] * ta)
+	panel:SetBackdropColor(kit:GetColor("backgroundTint"))
 
 	panel.bar:ClearAllPoints()
 	panel.bar:SetPoint("TOPLEFT", inset, -inset)

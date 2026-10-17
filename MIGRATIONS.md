@@ -2,6 +2,22 @@
 
 Each entry is a prompt for an AI assistant. Paste the prompt, then the addon's `.toc` and `.lua` files under it. Newest first.
 
+## 1.8.0: color settings start as a preset dropdown
+
+```
+Update this World of Warcraft: Forever addon (Lua 5.1, ## Interface: 16001) for ClaiibuAPI 1.8.0.
+
+What changed: page:Color now shows a dropdown of preset colors (Default, White, Black, Gray, Gold, Bronze, Silver, Red, Orange, Yellow, Green, Teal, Blue, Purple, Pink) ending in "Custom...", which opens Blizzard's color picker. It takes an optional presets = { { key, label, r, g, b }, ... } that replaces the standard list. Saved colors are unchanged ({ r, g, b, a }; hand-picked ones also get custom = true), and kit:GetColor works as before.
+
+1. Find color settings the addon offers as its own dropdown of named colors (for example a "Border Color" dropdown of gold/bronze/silver), or as a dropdown plus a separate color picker button. Replace each with one page:Color({ key = "<key>", label = "<Label>", presets = { <its named colors as { key, label, r, g, b }> }, hasAlpha = <true if opacity matters> }), with its default in defaults as { r, g, b, a }. Convert a saved name to a color once in kit:OnReady with kit:Set("<key>", { r = ..., g = ..., b = ..., a = ... }).
+2. Find hard-coded border and background tints (SetBackdropBorderColor / SetBackdropColor with fixed numbers, or a border's built-in tint only) that players should be able to change, and give each a page:Color setting ("Border Tint", "Background Tint") applied with kit:GetColor; multiply with a border's own media color when the addon uses one.
+3. Existing page:Color settings need no change; pass presets only where the standard list doesn't fit.
+4. Guard with if page.Color then ... end so the addon still loads on ClaiibuAPI older than 1.7.0 (1.7.0 ignores presets and shows a plain swatch). Keep ClaiibuAPI.Require(1, addonName).
+5. Do not change anything else. No new globals, no new event frames.
+
+Output every changed file in full (no fragments, no "rest unchanged"), then list the color settings and their presets.
+```
+
 ## 1.7.0: color selector (page:Color, kit:GetColor)
 
 ```
