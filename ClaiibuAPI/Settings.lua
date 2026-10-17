@@ -96,6 +96,12 @@ function PageSpec:Anchor(spec)
 	return Add(self, "Anchor", spec)
 end
 
+-- spec: key, label, tooltip, hasAlpha. The default must be a color table
+-- { r = 1, g = 1, b = 1, a = 1 } (0-1); read it with kit:GetColor(key).
+function PageSpec:Color(spec)
+	return Add(self, "Color", spec)
+end
+
 -- spec: label, text, tooltip, width, onClick(kit), enabled(kit)
 function PageSpec:Button(spec)
 	return Add(self, "Button", spec)
@@ -299,6 +305,13 @@ local function ReapplyTemporary(kit)
 	end
 end
 
+-- A color setting as r, g, b, a (0-1). Missing parts come from the default.
+-- kit:GetColor("barColor") -> 0.1, 0.8, 0.1, 1
+function Kit:GetColor(key)
+	local color = W.NormalizeColor(self.settings[key], self.defaults[key])
+	return color.r, color.g, color.b, color.a
+end
+
 -- The media entry a media setting points at (see Media.Get).
 function Kit:GetMedia(mediaType, key)
 	return Media.Get(mediaType, self.settings[key])
@@ -476,6 +489,20 @@ function BUILD.Anchor(kit, page, spec)
 		return SK.ANCHORS
 	end
 	page:Dropdown(bound)
+end
+
+function BUILD.Color(kit, page, spec)
+	local default = kit.defaults[spec.key]
+	if type(default) ~= "table" then
+		error(kit.addonName .. ": Color \"" .. tostring(spec.label) .. "\" needs a default like { r = 1, g = 1, b = 1, a = 1 } for \""
+			.. tostring(spec.key) .. "\"", 0)
+	end
+	local bound = Bind(kit, spec)
+	local set = bound.set
+	bound.set = function(color)
+		set(W.NormalizeColor(color, default))
+	end
+	page:Color(bound)
 end
 
 function BUILD.Button(kit, page, spec)

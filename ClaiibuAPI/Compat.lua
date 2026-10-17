@@ -109,6 +109,8 @@ function C.ProbeRows(kit)
 		"UICheckButtonTemplate: " .. Known(C.TemplateExists("UICheckButtonTemplate")),
 		"ScrollFrameTemplate: " .. Known(C.TemplateExists("ScrollFrameTemplate")),
 		"StaticPopup_Show: " .. Has(StaticPopup_Show),
+		"ColorPickerFrame: " .. Has(ColorPickerFrame) .. ", SetupColorPickerAndShow: "
+			.. Has(ColorPickerFrame and ColorPickerFrame.SetupColorPickerAndShow),
 		"BasicFrameTemplateWithInset (copy window): " .. Known(C.TemplateExists("BasicFrameTemplateWithInset")),
 		"EventRegistry (Edit Mode callbacks): " .. Has(EventRegistry and EventRegistry.RegisterCallback)
 			.. (SK.EditMode and SK.EditMode.listening and ", listening" or ""),
@@ -122,7 +124,7 @@ function C.ProbeRows(kit)
 		local used = SK.Widgets.used
 		rows[#rows + 1] = "Kit is using: window=" .. tostring(used.window) .. ", dropdown=" .. tostring(used.dropdown)
 			.. ", slider=" .. tostring(used.slider) .. ", checkbox=" .. tostring(used.checkbox)
-			.. ", dialogs=" .. tostring(used.dialogs) .. ", text box=" .. tostring(used.textBox)
+			.. ", dialogs=" .. tostring(used.dialogs) .. ", color picker=" .. tostring(used.colorPicker) .. ", text box=" .. tostring(used.textBox)
 		rows[#rows + 1] = "Settings for: " .. kit.addonName
 		rows[#rows + 1] = "Active profile: " .. tostring(kit:GetActiveProfile())
 	end

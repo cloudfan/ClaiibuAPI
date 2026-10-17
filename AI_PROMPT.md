@@ -86,6 +86,7 @@ Every other file of the addon must check `if not ns.kit then return end` at the 
 | `page:MediaDropdown{}` | `key`, `mediaType` (`"font"`, `"statusbar"`, `"border"`, `"background"`, `"sound"`), `label` (optional), `tooltip` | string media key |
 | `page:Anchor{}` | `key`, `label` (optional, default "Anchor Point"), `tooltip` | `"TOPLEFT"`, `"TOP"`, `"TOPRIGHT"`, `"LEFT"`, `"CENTER"`, `"RIGHT"`, `"BOTTOMLEFT"`, `"BOTTOM"` or `"BOTTOMRIGHT"` |
 | `page:FontShadow{}` | `key`, `label` (optional), `tooltip` | `"none"`, `"soft"`, `"hard"` or `"heavy"` |
+| `page:Color{}` | `key`, `label`, `tooltip`, `hasAlpha` (true to let players pick opacity) | `{ r, g, b, a }` table, values 0-1; its default in `defaults` must be such a table, e.g. `{ r = 1, g = 0.82, b = 0, a = 1 }` |
 | `page:Button{}` | `label` (row label, may be `""`), `text`, `tooltip`, `width`, `onClick(kit)`, `enabled(kit)` | — |
 
 Any control with a `key` (Checkbox, Slider, Dropdown, MediaDropdown, Anchor, FontShadow) also takes `reload = true`. Set it on every setting whose change can taint the UI until a reload: hiding, moving, reparenting or hooking Blizzard frames; changing secure or protected frames, attributes or state drivers; enabling or disabling a whole module that does any of those. Changing such a setting shows a "Reload UI / Ignore" dialog; Ignore keeps it away for `reloadCooldown` seconds, and an open dialog is never reopened. Do not set it on purely visual settings of the addon's own plain frames.
@@ -104,6 +105,7 @@ Kit calls (only after `OnReady`):
 | --- | --- |
 | `kit.settings.<key>` or `kit:Get(key)` | current value |
 | `kit:Set(key, value)` | change a value from code (saves and refreshes the pages) |
+| `kit:GetColor(key)` | `r, g, b, a` of a color setting, ready for `SetVertexColor`, `SetTextColor`, `SetStatusBarColor`, `SetBackdropColor` |
 | `kit:GetMedia(mediaType, key)` | `{ file, color = { r, g, b, a }, tile, tileSize, label }`; `file` is nil for "None" |
 | `kit:ApplyFont(fontString, fontKey, sizeKeyOrNumber, shadowKey, flags)` | sets font, size, shadow (and optional `"OUTLINE"` flags) |
 | `kit:ApplyAnchor(frame, pointKey, xKeyOrNumber, yKeyOrNumber, relativeTo)` | `ClearAllPoints` and `SetPoint(point, relativeTo or UIParent, point, x, y)` |

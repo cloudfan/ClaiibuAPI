@@ -8,7 +8,7 @@ This file is kept in step with the API. Every feature lists the version that add
 
 =====
 
-You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.6.0, API level 1. Repository: `cloudfan/ClaiibuAPI`.
+You explain **ClaiibuAPI** to people who write World of Warcraft: Forever addons. ClaiibuAPI version 1.7.0, API level 1. Repository: `cloudfan/ClaiibuAPI`.
 
 ## How to answer
 
@@ -304,6 +304,26 @@ local real = kit:GetSaved("showSolo")   -- the saved value, ignoring temporary o
 - Settings pages show and change the saved value. Changing a setting that has a temporary value changes the saved value only; the temporary one stays until cleared.
 - Profile switches, imports, Defaults and Save keep temporary values out of the saved strings and put them back on top afterwards.
 - The reload prompt (F20) compares saved values, so a temporary value never asks for a reload.
+
+### F24. Color selector (since 1.7.0)
+
+`page:Color({ key, label, tooltip, hasAlpha })`: a swatch showing the color and its hex code. Clicking it opens Blizzard's color picker (`ColorPickerFrame`); the color changes live while the player picks, and Cancel puts the old one back. The setting is saved as `{ r, g, b, a }` (0-1).
+
+```lua
+defaults = { barColor = { r = 0.1, g = 0.8, b = 0.1, a = 1 }, textColor = { r = 1, g = 1, b = 1, a = 1 } },
+page:Color({ key = "barColor", label = "Bar Color", hasAlpha = true })
+page:Color({ key = "textColor", label = "Text Color" })
+-- later:
+bar:SetStatusBarColor(kit:GetColor("barColor"))
+text:SetTextColor(kit:GetColor("textColor"))
+```
+
+- `kit:GetColor(key)` returns `r, g, b, a`; missing or out-of-range parts are filled from the default and clamped to 0-1.
+- `hasAlpha = true` adds the picker's opacity slider; without it, alpha stays as saved (1 by default).
+- The default must be a color table; anything else is an error when the settings load.
+- Colors go through profiles, export/import, Defaults, `reload = true` and temporary values like any other setting.
+- `onChange` runs for every step while the player drags in the picker, so keep it cheap.
+- Unverified on Forever: `ColorPickerFrame:SetupColorPickerAndShow` (the modern picker); the older field-based picker is used if it's missing, and `/claiibu probe` shows which.
 
 ### F23. Dispellable debuff tracker (1.5.0; DEPRECATED since 1.6.0)
 

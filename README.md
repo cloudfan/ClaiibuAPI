@@ -110,6 +110,7 @@ Every `key` must exist in `defaults`, with a value of the same type. A page that
 | `page:MediaDropdown{}` | `key`, `mediaType` (`font`, `statusbar`, `border`, `background`, `sound`), `label`, `tooltip` | media key |
 | `page:Anchor{}` | `key`, `label`, `tooltip` | `TOPLEFT` … `BOTTOMRIGHT` |
 | `page:FontShadow{}` | `key`, `label`, `tooltip` | `none`, `soft`, `hard`, `heavy` |
+| `page:Color{}` | `key`, `label`, `tooltip`, `hasAlpha` | `{ r, g, b, a }` (0–1). A swatch with the hex code; clicking opens Blizzard's color picker, which previews live and restores the old color on Cancel. The default must be a color table |
 | `page:Button{}` | `label`, `text`, `tooltip`, `width`, `onClick(kit)`, `enabled(kit)` | — |
 
 Add `reload = true` to any control with a `key` whose change can taint the UI until a reload (hiding, moving or hooking Blizzard frames, secure frames, toggling whole modules). Changing it then shows a **Reload UI / Ignore** dialog that names the changed settings. It compares against the value the UI loaded with, asks once per slider drag, also asks after profile switches, imports and Defaults, and **Ignore** keeps the dialog away for a cooldown (config field `reloadCooldown`, seconds, default 60). While the dialog is open, further changes leave it as it is instead of reopening it.
@@ -120,6 +121,7 @@ Add `reload = true` to any control with a `key` whose change can taint the UI un
 | --- | --- |
 | `kit.settings`, `kit:Get(key)` | The live settings of the active profile |
 | `kit:Set(key, value)` | Change a setting from code. Saves it and refreshes the pages |
+| `kit:GetColor(key)` | A color setting as `r, g, b, a`, e.g. `bar:SetStatusBarColor(kit:GetColor("barColor"))` |
 | `kit:GetMedia(mediaType, key)` | `{ file, color, tile, tileSize, label }`. `color` is `{ r, g, b, a }`; apply a border's with `SetBackdropBorderColor` |
 | `kit:ApplyFont(fontString, fontKey, size, shadowKey, flags)` | Font, size (number or setting key), shadow and optional flags |
 | `kit:ApplyAnchor(frame, pointKey, x, y, relativeTo)` | `ClearAllPoints` + `SetPoint(point, relativeTo or UIParent, point, x, y)`. `x`/`y` may be setting keys |

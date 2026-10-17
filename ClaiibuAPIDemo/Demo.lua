@@ -20,7 +20,7 @@ local kit = API.Settings.New(addonName, {
 		"Pages listed under the addon in Options -> AddOns, as a collapsible sublist",
 		"Sliders, checkboxes and dropdowns from Blizzard's own settings templates",
 		"Dropdowns with left and right steppers, listing Blizzard media first, then each LibSharedMedia pack under its own heading",
-		"Anchor point and font shadow selectors",
+		"Anchor point, font shadow and color selectors",
 		"Edit Mode: move the preview panel with Blizzard's blue and yellow highlight",
 		"Profiles saved as compact strings, shared across characters, with export and import",
 		"Diagnostics in a copy window, ready for Ctrl+C",
@@ -43,6 +43,8 @@ local kit = API.Settings.New(addonName, {
 		borderSize = 12,
 		background = "solid",
 		alertSound = "readycheck",
+		barColor = { r = 0.1, g = 0.7, b = 0.1, a = 1 },
+		textColor = { r = 1, g = 1, b = 1, a = 1 },
 		exampleReload = false,
 	},
 	onChange = function()
@@ -76,8 +78,10 @@ style:Header("Text")
 style:MediaDropdown({ key = "font", mediaType = "font" })
 style:Slider({ key = "fontSize", label = "Font Size", min = 8, max = 24, step = 1 })
 style:FontShadow({ key = "fontShadow" })
+style:Color({ key = "textColor", label = "Text Color" })
 style:Header("Frame")
 style:MediaDropdown({ key = "barTexture", mediaType = "statusbar" })
+style:Color({ key = "barColor", label = "Bar Color", hasAlpha = true, tooltip = "Click to open the color picker." })
 style:MediaDropdown({ key = "border", mediaType = "border" })
 style:Slider({ key = "borderSize", label = "Border Size", min = 1, max = 32, step = 1 })
 style:MediaDropdown({ key = "background", mediaType = "background" })
@@ -195,9 +199,10 @@ function Demo.Apply()
 	panel.bar:SetPoint("TOPLEFT", inset, -inset)
 	panel.bar:SetPoint("BOTTOMRIGHT", -inset, inset)
 	panel.bar:SetStatusBarTexture(kit:GetMedia("statusbar", "barTexture").file)
-	panel.bar:SetStatusBarColor(0.1, 0.7, 0.1)
+	panel.bar:SetStatusBarColor(kit:GetColor("barColor"))
 
 	kit:ApplyFont(panel.text, "font", "fontSize", "fontShadow")
+	panel.text:SetTextColor(kit:GetColor("textColor"))
 	Demo.editMode:UpdateBounds()
 end
 

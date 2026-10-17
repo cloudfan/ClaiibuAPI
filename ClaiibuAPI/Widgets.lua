@@ -468,6 +468,143 @@ function Page:Dropdown(spec)
 	return frame
 end
 
+-- Color ----------------------------------------------------------------------------
+-- A swatch that opens Blizzard's ColorPickerFrame. The value is a table
+-- { r, g, b, a } (0-1). Dragging in the picker previews the color live;
+-- Cancel puts the old one back.
+-- spec: label, tooltip, hasAlpha, get() -> color, set(color)
+
+-- A complete, fresh color table from any { r, g, b, a } (missing parts
+-- from fallback, then 1).
+function W.NormalizeColor(color, fallback)
+	color = type(color) == "table" and color or {}
+	fallback = type(fallback) == "table" and fallback or {}
+	local function Part(key)
+		local value = tonumber(color[key])
+		if value == nil then
+			value = tonumber(fallback[key]) or 1
+		end
+		return math.max(0, math.min(1, value))
+	end
+	return { r = Part("r"), g = Part("g"), b = Part("b"), a = Part("a") }
+end
+
+function W.ColorHex(color)
+	return format("%02X%02X%02X", math.floor(color.r * 255 + 0.5), math.floor(color.g * 255 + 0.5),
+		math.floor(color.b * 255 + 0.5))
+end
+
+-- Opens Blizzard's color picker. onChange(color) runs while the player
+-- picks and once more with the old color on Cancel. Returns false when the
+-- client has no picker.
+function W.OpenColorPicker(color, hasAlpha, onChange)
+	local picker = ColorPickerFrame
+	if not picker then
+		return false
+	end
+	local previous = W.NormalizeColor(color)
+	if picker.SetupColorPickerAndShow then
+		-- Modern picker (Mainline 10.2.5 and later): opacity is the alpha.
+		local function Current()
+			local r, g, b = picker:GetColorRGB()
+			local a = hasAlpha and picker.GetColorAlpha and picker:GetColorAlpha() or previous.a
+			return W.NormalizeColor({ r = r, g = g, b = b, a = a })
+		end
+		picker:SetupColorPickerAndShow({
+			r = previous.r, g = previous.g, b = previous.b,
+			opacity = previous.a,
+			hasOpacity = hasAlpha and true or false,
+			swatchFunc = function()
+				onChange(Current())
+			end,
+			opacityFunc = function()
+				onChange(Current())
+			end,
+			cancelFunc = function()
+				onChange(W.NormalizeColor(previous))
+			end,
+		})
+		W.used.colorPicker = "SetupColorPickerAndShow"
+		return true
+	end
+	-- Older picker: fields on the frame; opacity is 1 - alpha.
+	local function Current()
+		local r, g, b = picker:GetColorRGB()
+		local a = previous.a
+		if hasAlpha and OpacitySliderFrame then
+			a = 1 - OpacitySliderFrame:GetValue()
+		end
+		return W.NormalizeColor({ r = r, g = g, b = b, a = a })
+	end
+	picker.hasOpacity = hasAlpha and true or false
+	picker.opacity = 1 - previous.a
+	picker.previousValues = { previous.r, previous.g, previous.b, previous.a }
+	picker.func = function()
+		onChange(Current())
+	end
+	picker.opacityFunc = picker.func
+	picker.cancelFunc = function()
+		onChange(W.NormalizeColor(previous))
+	end
+	picker:SetColorRGB(previous.r, previous.g, previous.b)
+	picker:Hide()
+	if ShowUIPanel then
+		ShowUIPanel(picker)
+	else
+		picker:Show()
+	end
+	W.used.colorPicker = "ColorPickerFrame (fields)"
+	return true
+end
+
+function Page:Color(spec)
+	local center = self:Row(spec.label, spec.tooltip)
+	local button = CreateFrame("Button", nil, self.frame)
+	button:SetSize(26, 26)
+	self:Place(button, center)
+
+	-- A light border around the color, as Blizzard's swatches have.
+	local border = button:CreateTexture(nil, "BACKGROUND")
+	border:SetAllPoints()
+	border:SetColorTexture(0.8, 0.8, 0.8, 1)
+	local back = button:CreateTexture(nil, "BORDER")
+	back:SetPoint("TOPLEFT", 2, -2)
+	back:SetPoint("BOTTOMRIGHT", -2, 2)
+	back:SetColorTexture(0, 0, 0, 1)
+	local swatch = button:CreateTexture(nil, "ARTWORK")
+	swatch:SetPoint("TOPLEFT", 3, -3)
+	swatch:SetPoint("BOTTOMRIGHT", -3, 3)
+	swatch:SetColorTexture(1, 1, 1, 1)
+	button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+
+	local hex = self.frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	hex:SetPoint("LEFT", button, "RIGHT", 8, 0)
+
+	local function Show(color)
+		swatch:SetColorTexture(color.r, color.g, color.b, spec.hasAlpha and color.a or 1)
+		local text = "#" .. W.ColorHex(color)
+		if spec.hasAlpha then
+			text = text .. format("  %d%%", math.floor(color.a * 100 + 0.5))
+		end
+		hex:SetText(text)
+	end
+
+	button:SetScript("OnClick", function()
+		local opened = W.OpenColorPicker(spec.get(), spec.hasAlpha, function(color)
+			spec.set(color)
+			Show(color)
+		end)
+		if not opened then
+			print("|cffe0b060ClaiibuAPI|r This client has no color picker.")
+		end
+	end)
+	W.AttachTooltip(button, spec.label, spec.tooltip)
+	self.controls[#self.controls + 1] = function()
+		Show(W.NormalizeColor(spec.get()))
+	end
+	return button
+end
+
 -- Button ---------------------------------------------------------------------------
 -- spec: label (row label, may be empty), text, tooltip, width, onClick()
 

@@ -2,6 +2,21 @@
 
 Each entry is a prompt for an AI assistant. Paste the prompt, then the addon's `.toc` and `.lua` files under it. Newest first.
 
+## 1.7.0: color selector (page:Color, kit:GetColor)
+
+```
+Update this World of Warcraft: Forever addon (Lua 5.1, ## Interface: 16001) to use ClaiibuAPI 1.7.0's color selector.
+
+1. Find colors the player should be able to change but that are hard-coded or set in other ways: SetVertexColor, SetTextColor, SetStatusBarColor, SetBackdropColor or SetBackdropBorderColor with literal numbers, color dropdowns, or separate R/G/B sliders, and any code that opens ColorPickerFrame itself.
+2. For each one the player should pick: add a setting to defaults as a table { r = <r>, g = <g>, b = <b>, a = <a> } with the current values, add page:Color({ key = "<key>", label = "<Label>", hasAlpha = <true if opacity matters> }) to the right page, and use kit:GetColor("<key>") where the color is applied (it returns r, g, b, a).
+3. Remove the replaced R/G/B sliders, color dropdowns and the addon's own ColorPickerFrame code, and their keys from defaults.
+4. If the addon stored colors in another format, convert them once in kit:OnReady with kit:Set("<key>", { r = ..., g = ..., b = ..., a = ... }).
+5. Guard with if page.Color then ... else <keep the old control> end (and kit.GetColor) so the addon still loads on ClaiibuAPI older than 1.7.0. Keep ClaiibuAPI.Require(1, addonName). Add "Requires ClaiibuAPI 1.7.0 or newer for color settings" to the README or notes.
+6. Do not change anything else. No new globals, no new event frames.
+
+Output every changed file in full (no fragments, no "rest unchanged"), then list the color settings you added.
+```
+
 ## 1.6.0: dispel tracker deprecated
 
 ```
